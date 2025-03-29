@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/extrame/xls"
@@ -70,19 +69,15 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 		}
 
 		// ...
-		payee := row[1]
 		date := row[0]
-
-		valueStr := strings.ReplaceAll(strings.ReplaceAll(row[3], "R$ ", ""), ",", ".")
-		value, err := strconv.ParseFloat(valueStr, 64)
-		if err != nil {
-			p.logger.Info("error parsing value", "row", row, "error", err)
-			continue
-		}
+		payee := row[1]
+		valueStr := row[3]
 
 		// Create transaction
-		transaction, err := models.NewTransaction(date, payee, -value).
+		transaction, err := models.NewTransaction(payee).
 			AsFatura(cardType, cardNumber).
+			SetValueFromFatura(valueStr).
+			SetDate(date).
 			Build()
 		if err != nil {
 			p.logger.Debug("error building transaction", "row", row, "error", err)

@@ -3,7 +3,6 @@ package parser
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 
 	"github.com/extrame/xls"
 	"github.com/yurifrl/ynabu/pkg/models"
@@ -41,14 +40,12 @@ func (p *Parser) ParseItauExtratoXLS(data []byte) ([]models.Transaction, error) 
 		// ...
 		date := row[0]
 		payee := row[1]
-		valueStr := row[3]
-		value, err := strconv.ParseFloat(valueStr, 64)
-		if err != nil {
-			continue
-		}
+		value := row[3]
 
-		transaction, err := models.NewTransaction(date, payee, value).
+		transaction, err := models.NewTransaction(payee).
 			AsExtrato().
+			SetValueFromExtrato(value).
+			SetDate(date).
 			Build()
 		if err != nil {
 			p.logger.Debug("error building transaction", "row", row, "error", err)

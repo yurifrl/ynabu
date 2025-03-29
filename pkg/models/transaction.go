@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/log"
@@ -19,13 +20,12 @@ type Transaction struct {
 	cardType   string
 	cardNumber string
 	logger     *log.Logger
+	err        error
 }
 
-func NewTransaction(date string, payee string, value float64) *Transaction {
+func NewTransaction(payee string) *Transaction {
 	return &Transaction{
-		date:   strings.TrimSpace(date),
-		payee:  strings.TrimSpace(payee),
-		amount: value,
+		payee: strings.TrimSpace(payee),
 	}
 }
 
@@ -43,14 +43,14 @@ func (t *Transaction) AsExtrato() *Transaction {
 
 func (t *Transaction) Build() (*Transaction, error) {
 	// Validation
+	if t.err != nil {
+		return nil, t.err
+	}
 	if t.docType == "" {
 		return nil, fmt.Errorf("docType is required")
 	}
 	if t.payee == "" {
 		return nil, fmt.Errorf("payee is required")
-	}
-	if len(t.date) != 10 {
-		return nil, fmt.Errorf("date is required")
 	}
 
 	// Generate memo
@@ -76,11 +76,53 @@ func (t *Transaction) ToCSV() []byte {
 		t.amount))
 }
 
-func ToCSV(transactions []Transaction) []byte {
+type ValidCsv interface {
+	Date() string
+	Payee() string
+	Memo() string
+	Amount() float64
+}
+
+func ToCSV(transactions []ValidCsv) []byte {
 	var buf bytes.Buffer
 	buf.WriteString("Date,Payee,Memo,Amount\n")
 	for _, t := range transactions {
 		buf.Write(t.ToCSV())
 	}
 	return buf.Bytes()
+}
+
+func (t *Transaction) SetValueFromExtrato(valueStr string) *Transaction {
+	valueStr = strings.TrimSpace(strings.ReplaceAll(valueStr, ",", "."))
+	value, err := strconv.ParseFloat(valueStr, 64)
+	if err != nil {
+		t.err = err
+		return t
+	}
+
+	t.amount = value
+	return t
+}
+
+func (t *Transaction) SetValueFromFatura(valueStr string) *Transaction {
+	valueStr = strings.ReplaceAll(strings.ReplaceAll(valueStr, "R$ ", ""), ",", ".")
+	value, err := strconv.ParseFloat(valueStr, 64)
+	if err != nil {
+		t.err = err
+		return t
+	}
+
+	t.amount = -value
+	return t
+}
+
+func (t *Transaction) SetDate(date string) *Transaction {
+	t.date = strings.TrimSpace(date)
+	if len(t.date) != 10 {
+		t.err = fmt.Errorf("date is required")
+		return t
+	}
+
+	t.date = fmt.Sprintf("%s/%s/%s", t.date[6:10], t.date[3:5], t.date[0:2])
+	return t
 }

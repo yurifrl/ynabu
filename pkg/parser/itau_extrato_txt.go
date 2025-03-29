@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/yurifrl/ynabu/pkg/models"
@@ -21,17 +20,15 @@ func (p *Parser) ParseItauExtratoTXT(data []byte) ([]models.Transaction, error) 
 			continue
 		}
 
-		valueStr := strings.TrimSpace(strings.ReplaceAll(fields[2], ",", "."))
-		value, err := strconv.ParseFloat(valueStr, 64)
-		if err != nil {
-			p.logger.Debug("error parsing value", "row", line, "error", err)
-			continue
-		}
-
+		// ...
+		value := fields[2]
 		date := fields[0]
 		payee := fields[1]
-		transaction, err := models.NewTransaction(date, payee, value).
+
+		transaction, err := models.NewTransaction(payee).
 			AsExtrato().
+			SetValueFromExtrato(value).
+			SetDate(date).
 			Build()
 		if err != nil {
 			p.logger.Debug("error building transaction", "row", line, "error", err)
