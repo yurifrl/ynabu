@@ -1,30 +1,21 @@
 package parser
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/yurifrl/ynabu/pkg/models"
 )
 
-func TestParseFatura(t *testing.T) {
-	// Create a temporary test file
-	content := `17/03/2025;PIX TRANSF ID_A15/03;-2327,00
+func TestProcessBytes(t *testing.T) {
+	content := []byte(`17/03/2025;PIX TRANSF ID_A15/03;-2327,00
 17/03/2025;MOBILE PAG TIT 426XXXXXX;-287,00
-19/03/2025;PIX TRANSF ID_C19/03;-1900,00`
+19/03/2025;PIX TRANSF ID_C19/03;-1900,00`)
 
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "test_fatura.txt")
-	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	// Test the ParseFatura function
-	transactions, err := ParseFatura(tmpFile)
+	// Test the ProcessBytes function
+	transactions, err := ProcessBytes(content, "test_fatura.txt")
 	if err != nil {
-		t.Fatalf("ParseFatura failed: %v", err)
+		t.Fatalf("ProcessBytes failed: %v", err)
 	}
 
 	// Expected transactions
@@ -33,20 +24,20 @@ func TestParseFatura(t *testing.T) {
 		{
 			Date:    expectedDate,
 			Payee:   "PIX TRANSF ID_A15/03",
-			Outflow: 2327.00,
-			Memo:    generateTransactionID(expectedDate, "PIX TRANSF ID_A15/03") + ",extrato,-",
+			Outflow: -2327.00,
+			Memo:    "c0e4bc31,fatura,-",
 		},
 		{
 			Date:    expectedDate,
 			Payee:   "MOBILE PAG TIT 426XXXXXX",
-			Outflow: 287.00,
-			Memo:    generateTransactionID(expectedDate, "MOBILE PAG TIT 426XXXXXX") + ",extrato,-",
+			Outflow: -287.00,
+			Memo:    "6a8e49f2,fatura,-",
 		},
 		{
 			Date:    time.Date(2025, 3, 19, 0, 0, 0, 0, time.UTC),
 			Payee:   "PIX TRANSF ID_C19/03",
-			Outflow: 1900.00,
-			Memo:    generateTransactionID(time.Date(2025, 3, 19, 0, 0, 0, 0, time.UTC), "PIX TRANSF ID_C19/03") + ",extrato,-",
+			Outflow: -1900.00,
+			Memo:    "d31a6c7e,fatura,-",
 		},
 	}
 
