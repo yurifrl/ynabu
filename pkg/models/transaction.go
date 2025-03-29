@@ -14,8 +14,7 @@ type Transaction struct {
 	date       string
 	payee      string
 	memo       string
-	outflow    float64
-	inflow     float64
+	amount     float64
 	docType    string
 	cardType   string
 	cardNumber string
@@ -23,18 +22,10 @@ type Transaction struct {
 }
 
 func NewTransaction(date string, payee string, value float64) *Transaction {
-	var outflow, inflow float64
-	if value < 0 {
-		outflow = -value
-	} else {
-		inflow = value
-	}
-
 	return &Transaction{
-		date:    strings.TrimSpace(date),
-		payee:   strings.TrimSpace(payee),
-		outflow: outflow,
-		inflow:  inflow,
+		date:   strings.TrimSpace(date),
+		payee:  strings.TrimSpace(payee),
+		amount: value,
 	}
 }
 
@@ -52,12 +43,15 @@ func (t *Transaction) AsExtrato() *Transaction {
 
 func (t *Transaction) Build() (*Transaction, error) {
 	// Validation
-	// if t.docType == "" {
-	// 	return nil, fmt.Errorf("docType is required")
-	// }
-	// if t.payee == "" {
-	// 	return nil, fmt.Errorf("payee is required")
-	// }
+	if t.docType == "" {
+		return nil, fmt.Errorf("docType is required")
+	}
+	if t.payee == "" {
+		return nil, fmt.Errorf("payee is required")
+	}
+	if len(t.date) != 10 {
+		return nil, fmt.Errorf("date is required")
+	}
 
 	// Generate memo
 	if t.docType == "fatura" {
@@ -75,17 +69,16 @@ func (t *Transaction) genID() string {
 }
 
 func (t *Transaction) ToCSV() []byte {
-	return []byte(fmt.Sprintf("%s,%s,%s,%.2f,%.2f\n",
+	return []byte(fmt.Sprintf("%s,%s,%s,%.2f\n",
 		t.date,
 		t.payee,
 		t.memo,
-		t.outflow,
-		t.inflow))
+		t.amount))
 }
 
 func ToCSV(transactions []Transaction) []byte {
 	var buf bytes.Buffer
-	buf.WriteString("Date,Payee,Memo,Outflow,Inflow\n")
+	buf.WriteString("Date,Payee,Memo,Amount\n")
 	for _, t := range transactions {
 		buf.Write(t.ToCSV())
 	}

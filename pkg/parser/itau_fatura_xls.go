@@ -17,7 +17,10 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 		return nil, fmt.Errorf("error creating workbook: %w", err)
 	}
 
+	p.logger.Debug("reading workbook", "sheet_count", workbook.NumSheets())
+
 	rows := workbook.ReadAllCells(1000)
+	p.logger.Debug("read rows", "count", len(rows))
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("no data found in sheet")
 	}
@@ -33,22 +36,20 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 			continue
 		}
 
-		// Check for card holder section
 		text := strings.TrimSpace(row[0])
-		if strings.Contains(text, "  final ") {
-			if strings.HasSuffix(text, "(titular)") {
+
+		// Check for card holder section
+		if strings.Contains(strings.ToLower(text), "total nacional do cartão - final") {
+			if matches := cardNumberRegex.FindStringSubmatch(text); len(matches) > 1 {
+				cardNumber = matches[1]
+			}
+			if strings.Contains(strings.ToLower(text), "(titular)") {
 				cardType = "titular"
-				if matches := cardNumberRegex.FindStringSubmatch(text); len(matches) > 1 {
-					cardNumber = matches[1]
-				}
 				foundTransactions = true
 				continue
 			}
-			if strings.HasSuffix(text, "(adicional)") {
+			if strings.Contains(strings.ToLower(text), "(adicional)") {
 				cardType = "adicional"
-				if matches := cardNumberRegex.FindStringSubmatch(text); len(matches) > 1 {
-					cardNumber = matches[1]
-				}
 				foundTransactions = true
 				continue
 			}
@@ -59,7 +60,7 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 		}
 
 		// Skip header and total rows
-		if row[0] == "data" || strings.Contains(strings.ToLower(row[0]), "total") {
+		if strings.ToLower(row[0]) == "data" || strings.Contains(strings.ToLower(row[0]), "total") {
 			continue
 		}
 
@@ -70,17 +71,7 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 
 		// ...
 		payee := row[1]
-		if payee == "" {
-			p.logger.Info("payee is empty", "row", row)
-			continue
-		}
-
-		// ...
 		date := row[0]
-		if date == "" {
-			p.logger.Info("date is empty", "row", row)
-			continue
-		}
 
 		valueStr := strings.ReplaceAll(strings.ReplaceAll(row[3], "R$ ", ""), ",", ".")
 		value, err := strconv.ParseFloat(valueStr, 64)
@@ -90,7 +81,7 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 		}
 
 		// Create transaction
-		transaction, err := models.NewTransaction(date, payee, value).
+		transaction, err := models.NewTransaction(date, payee, -value).
 			AsFatura(cardType, cardNumber).
 			Build()
 		if err != nil {

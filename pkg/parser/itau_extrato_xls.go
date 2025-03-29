@@ -38,11 +38,6 @@ func (p *Parser) ParseItauExtratoXLS(data []byte) ([]models.Transaction, error) 
 			continue
 		}
 
-		// Skip header and empty rows
-		if row[0] == "data" || row[1] == "SALDO TOTAL DISPONÃ" || row[1] == "SALDO ANTERIOR" {
-			continue
-		}
-
 		// ...
 		date := row[0]
 		payee := row[1]
