@@ -22,6 +22,7 @@ type filters struct {
 	minAmount float64
 	maxAmount float64
 	payee     string
+	print     bool
 }
 
 func (f *filters) toFilterFunc() csv.FilterFunc[*models.Transaction] {
@@ -65,6 +66,7 @@ func main() {
 	var f filters
 
 	flag.StringVar(&outputDir, "o", "", "Output directory (default: same as input directory)")
+	flag.BoolVar(&f.print, "print", false, "Print to stdout instead of saving to file")
 	flag.StringVar(&f.startDate, "start", "", "Start date (YYYY/MM/DD)")
 	flag.StringVar(&f.endDate, "end", "", "End date (YYYY/MM/DD)")
 	flag.Float64Var(&f.minAmount, "min", 0, "Minimum amount")
@@ -74,23 +76,46 @@ func main() {
 
 	args := flag.Args()
 	if len(args) != 1 {
-		logger.Fatal("Usage: cli [-o output_dir] [-start YYYY/MM/DD] [-end YYYY/MM/DD] [-min amount] [-max amount] [-payee text] <input_dir>")
+		logger.Fatal("Usage: cli [-o output_dir] [-print] [-start YYYY/MM/DD] [-end YYYY/MM/DD] [-min amount] [-max amount] [-payee text] <input_path>")
 	}
 
-	inputDir := args[0]
-
+	inputPath := args[0]
 	if outputDir == "" {
-		outputDir = inputDir
+		outputDir = filepath.Dir(inputPath)
 	}
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		logger.Fatal("failed to create output directory", "error", err)
+	if !f.print {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			logger.Fatal("failed to create output directory", "error", err)
+		}
 	}
 
 	processor := NewFileProcessor(logger, &f)
+	matches, err := filepath.Glob(inputPath)
+	if err != nil {
+		logger.Fatal("failed to resolve glob pattern", "error", err)
+	}
 
-	if err := processor.ProcessDirectory(inputDir, outputDir); err != nil {
-		logger.Fatal("failed to process directory", "error", err)
+	if len(matches) == 0 {
+		logger.Fatal("no files found matching pattern", "pattern", inputPath)
+	}
+
+	for _, match := range matches {
+		fileInfo, err := os.Stat(match)
+		if err != nil {
+			logger.Warn("failed to stat file", "error", err, "file", match)
+			continue
+		}
+
+		if fileInfo.IsDir() {
+			if err := processor.ProcessDirectory(match, outputDir); err != nil {
+				logger.Warn("failed to process directory", "error", err, "dir", match)
+			}
+		} else {
+			if err := processor.ProcessFile(match, outputDir); err != nil {
+				logger.Warn("failed to process file", "error", err, "file", match)
+			}
+		}
 	}
 }
 
@@ -139,6 +164,11 @@ func (p *FileProcessor) ProcessFile(inputPath, outputDir string) error {
 	}
 
 	outputBytes := csv.Create(transactions, p.filters.toFilterFunc())
+
+	if p.filters.print {
+		fmt.Print(string(outputBytes))
+		return nil
+	}
 
 	filename := filepath.Base(inputPath)
 	ext := filepath.Ext(filename)

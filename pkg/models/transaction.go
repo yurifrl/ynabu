@@ -62,7 +62,7 @@ func (t *Transaction) Build() (*Transaction, error) {
 }
 
 func (t *Transaction) genID() string {
-	data := fmt.Sprintf("%s-%s", t.date, t.payee)
+	data := fmt.Sprintf("%s-%s-%.2f", t.date, t.payee, t.amount)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:8])
 }
