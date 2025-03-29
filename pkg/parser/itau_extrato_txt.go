@@ -6,8 +6,8 @@ import (
 	"github.com/yurifrl/ynabu/pkg/models"
 )
 
-func (p *Parser) ParseItauExtratoTXT(data []byte) ([]models.Transaction, error) {
-	var transactions []models.Transaction
+func (p *Parser) ParseItauExtratoTXT(data []byte) ([]*models.Transaction, error) {
+	var transactions []*models.Transaction
 	lines := strings.Split(string(data), "\n")
 
 	for _, line := range lines {
@@ -20,7 +20,6 @@ func (p *Parser) ParseItauExtratoTXT(data []byte) ([]models.Transaction, error) 
 			continue
 		}
 
-		// ...
 		value := fields[2]
 		date := fields[0]
 		payee := fields[1]
@@ -35,7 +34,7 @@ func (p *Parser) ParseItauExtratoTXT(data []byte) ([]models.Transaction, error) 
 			continue
 		}
 
-		transactions = append(transactions, *transaction)
+		transactions = append(transactions, transaction)
 	}
 
 	return transactions, nil

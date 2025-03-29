@@ -1,60 +1,37 @@
-# YNABU - YNAB Bank Statement Utility
+# YNABU - Utilitário de Extratos para YNAB
 
-A command-line tool to convert bank statements from Itaú into YNAB-compatible CSV format.
+Converte extratos do Itaú para formato CSV compatível com YNAB.
 
-## Features
-
-- Converts Itaú bank statements (Extrato) to YNAB CSV format
-- Converts Itaú credit card statements (Fatura) to YNAB CSV format
-- Converts Itaú CSV/TXT exports to YNAB CSV format
-- Processes multiple files in a directory
-- Preserves transaction details including date, payee, and amount
-- Automatically categorizes transactions as inflow or outflow
-- Smart detection of CSV formats (supports both comma and semicolon separators)
-
-## Usage
-
+## Instalação
 ```bash
-# Process all XLS/CSV/TXT files in the current directory
+go install github.com/yurifrl/ynabu/cmd/ynabu@latest
+```
+
+## Uso
+```bash
+# Processar arquivos do diretório atual
 ynabu .
 
-# Process all files in a specific directory
-ynabu /path/to/directory
+# Processar diretório específico
+ynabu /dir
 
-# Process files and save output to a specific directory
-ynabu -o /path/to/output/dir /path/to/input/dir
-
-# By default, output files are saved in the same directory as the input files
-# with "-ynabu.csv" appended to the original filename
+# Diretório de saída personalizado
+ynabu -o /dir/saida /dir/entrada
 ```
 
-## Supported File Types
+## Arquivos Suportados
+- Extratos bancários Itaú (TXT e XLS)
+- Faturas de cartão Itaú (XLS)
 
-- XLS bank statements (Extrato)
-- XLS credit card statements (Fatura)
-- CSV/TXT files with transaction data
-  - Must contain at least date and value columns
-  - Supports various date formats
-  - Automatically detects column headers
-  - Skips files already in YNAB format
+Arquivos são salvos como `-ynabu.$EXT.csv` no formato YNAB: Date, Payee, Memo, Amount.
 
-## Output Format
-
-The tool generates CSV files with the following columns:
-- Date (YYYY-MM-DD)
-- Payee
-- Memo (includes import date)
-- Outflow
-- Inflow
-
-## Building
-
+## Desenvolvimento
 ```bash
+# Executar localmente
+go run ./cmd/ynabu
+
+# Build
 go build -o ynabu ./cmd/ynabu
-```
 
-## Installation
-
-```bash
-go install github.com/yurifreire/ynabu/cmd/ynabu@latest
-``` 
+# Testes
+go test ./...

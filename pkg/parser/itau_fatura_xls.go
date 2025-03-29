@@ -10,7 +10,7 @@ import (
 	"github.com/yurifrl/ynabu/pkg/models"
 )
 
-func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
+func (p *Parser) ParseItauFaturaXLS(data []byte) ([]*models.Transaction, error) {
 	workbook, err := xls.OpenReader(bytes.NewReader(data), "cp1252")
 	if err != nil {
 		return nil, fmt.Errorf("error creating workbook: %w", err)
@@ -25,7 +25,7 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 	}
 
 	var cardNumberRegex = regexp.MustCompile(`final (\d+)`)
-	var transactions []models.Transaction
+	var transactions []*models.Transaction
 	var cardType string
 	var cardNumber string
 	var foundTransactions bool
@@ -84,7 +84,7 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]models.Transaction, error) {
 			continue
 		}
 
-		transactions = append(transactions, *transaction)
+		transactions = append(transactions, transaction)
 	}
 
 	return transactions, nil

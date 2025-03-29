@@ -2,11 +2,9 @@ package parser
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/charmbracelet/log"
-	"github.com/extrame/xls"
 	"github.com/yurifrl/ynabu/pkg/models"
 )
 
@@ -15,7 +13,6 @@ type FileType string
 const (
 	ItauExtratoXLS FileType = "itau_extrato_xls"
 	ItauFaturaXLS  FileType = "itau_fatura_xls"
-	ItauFaturaTXT  FileType = "itau_fatura_txt"
 	ItauExtratoTXT FileType = "itau_extrato_txt"
 )
 
@@ -29,28 +26,21 @@ func New(logger *log.Logger) *Parser {
 	}
 }
 
-func (p *Parser) ProcessBytes(data []byte, filename string) ([]byte, error) {
+func (p *Parser) ProcessBytes(data []byte, filename string) ([]*models.Transaction, error) {
 	fileType := detectType(filename)
 	p.logger.Debug("detected file type", "type", fileType, "filename", filename)
-	var transactions []models.Transaction
-	var err error
 
 	switch fileType {
 	case ItauExtratoXLS:
-		transactions, err = p.ParseItauExtratoXLS(data)
+		return p.ParseItauExtratoXLS(data)
 	case ItauFaturaXLS:
-		transactions, err = p.ParseItauFaturaXLS(data)
+		return p.ParseItauFaturaXLS(data)
 	case ItauExtratoTXT:
-		transactions, err = p.ParseItauExtratoTXT(data)
+		return p.ParseItauExtratoTXT(data)
 	default:
+		p.logger.Debug("unknown file type", "filename", filename)
 		return nil, fmt.Errorf("unknown file type")
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return models.ToCSV(transactions), nil
 }
 
 func detectType(filename string) FileType {
@@ -67,20 +57,4 @@ func detectType(filename string) FileType {
 		return ItauFaturaXLS
 	}
 	return ""
-}
-
-// TODO REMOVE
-func openXLSFile(filePath string) (*xls.WorkBook, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("error opening file: %w", err)
-	}
-	defer file.Close()
-
-	workbook, err := xls.OpenReader(file, "cp1252")
-	if err != nil {
-		return nil, fmt.Errorf("error creating workbook: %w", err)
-	}
-
-	return workbook, nil
 }

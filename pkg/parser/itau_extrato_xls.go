@@ -8,7 +8,7 @@ import (
 	"github.com/yurifrl/ynabu/pkg/models"
 )
 
-func (p *Parser) ParseItauExtratoXLS(data []byte) ([]models.Transaction, error) {
+func (p *Parser) ParseItauExtratoXLS(data []byte) ([]*models.Transaction, error) {
 	workbook, err := xls.OpenReader(bytes.NewReader(data), "cp1252")
 	if err != nil {
 		return nil, fmt.Errorf("error creating workbook: %w", err)
@@ -19,7 +19,7 @@ func (p *Parser) ParseItauExtratoXLS(data []byte) ([]models.Transaction, error) 
 		return nil, fmt.Errorf("no data found in sheet")
 	}
 
-	var transactions []models.Transaction
+	var transactions []*models.Transaction
 	var foundTransactions bool
 
 	for _, row := range rows {
@@ -37,7 +37,6 @@ func (p *Parser) ParseItauExtratoXLS(data []byte) ([]models.Transaction, error) 
 			continue
 		}
 
-		// ...
 		date := row[0]
 		payee := row[1]
 		value := row[3]
@@ -52,7 +51,7 @@ func (p *Parser) ParseItauExtratoXLS(data []byte) ([]models.Transaction, error) 
 			continue
 		}
 
-		transactions = append(transactions, *transaction)
+		transactions = append(transactions, transaction)
 	}
 
 	return transactions, nil

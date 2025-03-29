@@ -1,7 +1,6 @@
 package models
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -68,30 +67,6 @@ func (t *Transaction) genID() string {
 	return hex.EncodeToString(hash[:8])
 }
 
-func (t *Transaction) ToCSV() []byte {
-	return []byte(fmt.Sprintf("%s,%s,%s,%.2f\n",
-		t.date,
-		t.payee,
-		t.memo,
-		t.amount))
-}
-
-type ValidCsv interface {
-	Date() string
-	Payee() string
-	Memo() string
-	Amount() float64
-}
-
-func ToCSV(transactions []ValidCsv) []byte {
-	var buf bytes.Buffer
-	buf.WriteString("Date,Payee,Memo,Amount\n")
-	for _, t := range transactions {
-		buf.Write(t.ToCSV())
-	}
-	return buf.Bytes()
-}
-
 func (t *Transaction) SetValueFromExtrato(valueStr string) *Transaction {
 	valueStr = strings.TrimSpace(strings.ReplaceAll(valueStr, ",", "."))
 	value, err := strconv.ParseFloat(valueStr, 64)
@@ -125,4 +100,20 @@ func (t *Transaction) SetDate(date string) *Transaction {
 
 	t.date = fmt.Sprintf("%s/%s/%s", t.date[6:10], t.date[3:5], t.date[0:2])
 	return t
+}
+
+func (t *Transaction) Date() string {
+	return t.date
+}
+
+func (t *Transaction) Payee() string {
+	return t.payee
+}
+
+func (t *Transaction) Memo() string {
+	return t.memo
+}
+
+func (t *Transaction) Amount() float64 {
+	return t.amount
 }
