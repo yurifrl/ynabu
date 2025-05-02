@@ -20,7 +20,7 @@ jobs:
 
   build:
     name: Build CLI
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
@@ -52,9 +52,8 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o ${{ matrix.binary }} .
-          chmod +x ${{ matrix.binary }}
-          if [[ "${{ matrix.os }}" == "darwin" ]]; then
+          go build -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o ${{ matrix.binary }} ./cmd/cli
+          if [ "${{ matrix.os }}" = "darwin" ]; then
             zip -j ${{ matrix.binary }}.zip ${{ matrix.binary }}
             mv ${{ matrix.binary }}.zip ${{ matrix.binary }}
           fi
@@ -63,8 +62,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.binary }}
-          path: |
-            ${{ matrix.binary }}
+          path: ${{ matrix.binary }}
           retention-days: 5
 
   release:
