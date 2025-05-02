@@ -1,0 +1,9 @@
+image:
+  repository: ghcr.io/yurifrl/ynabu
+  tag: "" # Default to Chart.yaml appVersion
+  
+service:
+  port: 3000
+
+gateways: []
+hosts: []

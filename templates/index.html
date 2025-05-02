@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YNABU</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        body { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .error { color: red; }
+        .success { color: green; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f5f5f5; }
+        .amount { text-align: right; }
+        .amount.negative { color: red; }
+        .amount.positive { color: green; }
+        .actions { margin: 20px 0; display: flex; gap: 10px; }
+        .copy-feedback { opacity: 0; transition: opacity 0.3s; margin-left: 10px; }
+        .copy-feedback.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <h1>YNABU - YNAB Bank Statement Converter</h1>
+    <form hx-post="/api/convert" 
+          hx-encoding="multipart/form-data"
+          hx-trigger="change from:input[type=file]"
+          hx-target="#result">
+        <input type="file" name="statement" accept=".txt,.xls" required>
+    </form>
+    <div id="result"></div>
+    <template id="success-template">
+        <div class="result-container">
+            <div class="actions">
+                <a href="" class="download-link">Download CSV</a>
+                <button onclick="copyToClipboard(this)" class="copy-btn">Copy CSV</button>
+                <span class="copy-feedback">✓ Copied!</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Payee</th>
+                        <th>Amount</th>
+                        <th>Memo</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </template>
+    <script>
+        function formatAmount(amount) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(amount);
+        }
+
+        function copyToClipboard(btn) {
+            const container = btn.closest('.result-container');
+            if (!container) return;
+            
+            const table = container.querySelector('table');
+            if (!table) return;
+            
+            const rows = Array.from(table.querySelectorAll('tr'));
+            const csvContent = rows.map(row => {
+                return Array.from(row.cells || row.querySelectorAll('th'))
+                    .map(cell => {
+                        let text = cell.textContent.trim();
+                        if (cell.classList.contains('amount')) {
+                            text = cell.dataset.rawAmount;
+                        }
+                        if (text.includes(',') || text.includes('"')) {
+                            text = '"' + text.replace(/"/g, '""') + '"';
+                        }
+                        return text;
+                    })
+                    .join(',');
+            }).join('\n');
+
+            navigator.clipboard.writeText(csvContent).then(() => {
+                const feedback = container.querySelector('.copy-feedback');
+                if (feedback) {
+                    feedback.classList.add('show');
+                    setTimeout(() => feedback.classList.remove('show'), 2000);
+                }
+            });
+        }
+
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.successful && evt.detail.target.id === 'result') {
+                try {
+                    const response = JSON.parse(evt.detail.xhr.response);
+                    if (response.status === 'success') {
+                        const template = document.getElementById('success-template');
+                        const clone = template.content.cloneNode(true);
+                        const link = clone.querySelector('.download-link');
+                        link.href = '/api/files/' + response.file;
+                        
+                        const tbody = clone.querySelector('tbody');
+                        response.data.forEach(tx => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${tx.date}</td>
+                                <td>${tx.payee}</td>
+                                <td class="amount ${tx.amount < 0 ? 'negative' : ''}" data-raw-amount="${tx.amount}">${formatAmount(tx.amount)}</td>
+                                <td>${tx.memo}</td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+
+                        evt.detail.target.innerHTML = '';
+                        evt.detail.target.appendChild(clone);
+                        return;
+                    }
+                } catch (e) {}
+            }
+            if (evt.detail.failed) {
+                evt.detail.target.innerHTML = '<div class="error">' + evt.detail.xhr.responseText + '</div>';
+            }
+        });
+    </script>
+</body>
+</html> 

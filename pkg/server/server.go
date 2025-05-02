@@ -3,105 +3,135 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
+	"path/filepath"
+	"strings"
+	"sync"
 
 	"github.com/charmbracelet/log"
+	"github.com/yurifrl/ynabu/pkg/csv"
+	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/parser"
 	"github.com/yurifrl/ynabu/pkg/types"
 )
 
 // Server handles HTTP requests for YNAB file processing
 type Server struct {
-	config types.Config
-	logger *log.Logger
-	mux    *http.ServeMux
+	config       types.Config
+	logger       *log.Logger
+	mux          *http.ServeMux
+	template     *template.Template
+	parser       *parser.Parser
+	transactions sync.Map
 }
 
 // New creates a new HTTP server
 func New(config types.Config, logger *log.Logger) *Server {
-	s := &Server{
-		config: config,
-		logger: logger,
-		mux:    http.NewServeMux(),
+	tmpl := template.Must(template.ParseGlob("templates/*.html"))
+	return &Server{
+		config:   config,
+		logger:   logger,
+		mux:      http.NewServeMux(),
+		template: tmpl,
+		parser:   parser.New(logger),
 	}
-
-	s.setupRoutes()
-	return s
 }
 
 // Start starts the HTTP server
 func (s *Server) Start(addr string) error {
-	s.logger.Info("server starting", "address", addr)
+	s.setupRoutes()
 	return http.ListenAndServe(addr, s.mux)
 }
 
 func (s *Server) setupRoutes() {
-	s.mux.HandleFunc("/process", s.handleProcessFile)
+	s.mux.HandleFunc("/", s.handleIndex)
+	s.mux.HandleFunc("/api/convert", s.handleConvert)
+	s.mux.HandleFunc("/api/files/", s.handleFiles)
 }
 
-func (s *Server) handleProcessFile(w http.ResponseWriter, r *http.Request) {
-	// Only allow POST method
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	s.template.ExecuteTemplate(w, "index.html", nil)
+}
+
+type Transaction struct {
+	Date   string  `json:"date"`
+	Payee  string  `json:"payee"`
+	Amount float64 `json:"amount"`
+	Memo   string  `json:"memo"`
+}
+
+func (s *Server) handleConvert(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		s.errorResponse(w, http.StatusMethodNotAllowed, "method not allowed", fmt.Errorf("expected POST, got %s", r.Method))
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Parse multipart form with 32MB max memory
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		s.errorResponse(w, http.StatusBadRequest, "failed to parse form", err)
-		return
-	}
-	defer r.MultipartForm.RemoveAll()
-
-	// Get the file from the request
-	file, header, err := r.FormFile("file")
+	file, header, err := r.FormFile("statement")
 	if err != nil {
-		s.errorResponse(w, http.StatusBadRequest, "failed to get file", err)
+		http.Error(w, "Failed to read file", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
-	// Read file bytes
-	fileBytes, err := io.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
-		s.errorResponse(w, http.StatusInternalServerError, "failed to read file", err)
+		http.Error(w, "Failed to read file", http.StatusInternalServerError)
 		return
 	}
 
-	parser := parser.New(s.logger)
-
-	// Process bytes using parser
-	outputBytes, err := parser.ProcessBytes(fileBytes, header.Filename)
+	transactions, err := s.parser.ProcessBytes(data, header.Filename)
 	if err != nil {
-		s.errorResponse(w, http.StatusInternalServerError, "failed to process file", err)
+		http.Error(w, fmt.Sprintf("Failed to process file: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	// Set headers for CSV download
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.csv", header.Filename))
+	filename := strings.TrimSuffix(header.Filename, filepath.Ext(header.Filename)) + "-ynabu.csv"
+	s.transactions.Store(filename, transactions)
 
-	// Write output bytes directly to response
-	if _, err := w.Write(outputBytes); err != nil {
-		s.logger.Error("failed to write response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+	// Convert to simplified transaction format for JSON
+	txs := make([]Transaction, len(transactions))
+	for i, t := range transactions {
+		txs[i] = Transaction{
+			Date:   t.Date(),
+			Payee:  t.Payee(),
+			Memo:   t.Memo(),
+			Amount: t.Amount(),
+		}
 	}
-}
 
-func (s *Server) errorResponse(w http.ResponseWriter, status int, message string, err error) {
-	s.logger.Error(message, "error", err)
-	response := map[string]string{
-		"error": fmt.Sprintf("%s: %v", message, err),
-	}
-	s.jsonResponse(w, status, response)
-}
-
-func (s *Server) jsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		s.logger.Error("failed to encode response", "error", err)
-	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"file":   filename,
+		"data":   txs,
+	})
 }
+
+func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	filename := strings.TrimPrefix(r.URL.Path, "/api/files/")
+	if filename == "" {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	transactions, ok := s.transactions.Load(filename)
+	if !ok {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	txs := transactions.([]*models.Transaction)
+	csvData := csv.Create(txs, nil)
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	w.Write(csvData)
+}
+

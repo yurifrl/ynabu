@@ -14,25 +14,20 @@ func main() {
 	logger := log.NewWithOptions(os.Stderr, log.Options{
 		ReportCaller:    true,
 		ReportTimestamp: true,
-		Prefix:          "ynabu-server",
+		Prefix:          "ynabu",
 	})
 
 	var (
-		port       int
-		outputPath string
+		port   = flag.String("port", "3000", "Server port")
+		output = flag.String("o", "", "Output directory")
 	)
-
-	flag.IntVar(&port, "port", 8080, "Port to listen on")
-	flag.StringVar(&outputPath, "o", "", "Output directory for processed files")
 	flag.Parse()
 
-	config := config.New(outputPath)
-	srv := server.New(config, logger)
-
-	addr := fmt.Sprintf(":%d", port)
-	logger.Info("starting server", "address", addr)
-
+	cfg := config.New(*output)
+	srv := server.New(cfg, logger)
+	addr := fmt.Sprintf("0.0.0.0:%s", *port)
+	logger.Info("starting server", "addr", addr)
 	if err := srv.Start(addr); err != nil {
-		logger.Fatal("server error", "error", err)
+		logger.Fatal("server error", "err", err)
 	}
 }
