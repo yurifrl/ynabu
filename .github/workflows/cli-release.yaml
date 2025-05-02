@@ -1,12 +1,8 @@
 name: CLI Release
 
 on:
-  create:
   push:
-    tags:
-      - 'v*'
-    branches:
-      - 'refs/tags/v*'
+    tags: ['v*']
 
 jobs:
   debug:

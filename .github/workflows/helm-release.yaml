@@ -2,10 +2,7 @@ name: Helm Release
 
 on:
   push:
-    tags:
-      - 'v*'
-    branches:
-      - 'refs/tags/v*'
+    tags: ['v*']
 
 jobs:
   release-charts:
