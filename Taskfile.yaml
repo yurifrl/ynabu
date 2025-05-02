@@ -5,3 +5,10 @@ tasks:
     cmds:
       - go build -o ynabu cmd/cli/main.go
       - mv ynabu ~/.bin/
+
+  tag-bump:
+    cmds:
+      - 'test -z "$(git status --porcelain)" || (echo "Error: Working directory not clean" && exit 1)'
+      - awk -F. '{$1++;$2=0;$3=0;print $1"."$2"."$3}' VERSION > VERSION.tmp && mv VERSION.tmp VERSION
+      - git tag v$(cat VERSION)
+      - git push origin v$(cat VERSION)
