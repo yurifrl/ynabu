@@ -63,12 +63,27 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]*models.Transaction, error) 
 			continue
 		}
 
-		// Skip empty rows or section headers
-		if row[0] == "" || strings.Contains(strings.ToLower(row[0]), "lançamentos") {
+		// Skip empty rows, section headers and informational rows
+		if row[0] == "" || 
+			strings.Contains(strings.ToLower(row[0]), "lançamentos") ||
+			strings.Contains(strings.ToLower(row[0]), "encargos") ||
+			strings.Contains(strings.ToLower(row[0]), "desta fatura") ||
+			strings.Contains(strings.ToLower(row[0]), "juros") ||
+			strings.Contains(strings.ToLower(row[0]), "compras parceladas") ||
+			strings.Contains(strings.ToLower(row[0]), "taxas") ||
+			strings.Contains(strings.ToLower(row[0]), "retirada") ||
+			strings.Contains(strings.ToLower(row[0]), "limites") ||
+			strings.Contains(strings.ToLower(row[0]), "no país") ||
+			strings.Contains(strings.ToLower(row[0]), "no exterior") ||
+			strings.Contains(strings.ToLower(row[0]), "pagamentos") {
 			continue
 		}
 
-		// ...
+		// Skip rows without proper date
+		if !regexp.MustCompile(`\d{2}/\d{2}`).MatchString(row[0]) {
+			continue
+		}
+
 		date := row[0]
 		payee := row[1]
 		valueStr := row[3]

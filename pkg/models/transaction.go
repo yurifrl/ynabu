@@ -22,9 +22,24 @@ type Transaction struct {
 	err        error
 }
 
+func cleanPayeeName(payee string) string {
+	if idx := strings.LastIndex(payee, "/"); idx > 0 && idx-2 >= 0 {
+		payee = payee[:idx-2]
+	}
+	
+	// Remove numbers from specific payees
+	if strings.HasPrefix(payee, "DA EDP SP") {
+		payee = "DA EDP SP"
+	} else if strings.HasPrefix(payee, "MOBILE PAG TIT") {
+		payee = "MOBILE PAG TIT"
+	}
+	
+	return strings.Join(strings.Fields(payee), " ")
+}
+
 func NewTransaction(payee string) *Transaction {
 	return &Transaction{
-		payee: strings.TrimSpace(payee),
+		payee: cleanPayeeName(payee),
 	}
 }
 
