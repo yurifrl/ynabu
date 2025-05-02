@@ -1,6 +1,7 @@
 name: CLI Release
 
 on:
+  create:
   push:
     tags:
       - 'v*'
@@ -8,6 +9,19 @@ on:
       - 'refs/tags/v*'
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Debug Event
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Ref type: ${{ github.ref_type }}"
+          echo "Full context:"
+          echo "$GITHUB_CONTEXT"
+
   build:
     name: Build CLI
     runs-on: ubuntu-24.04-arm
