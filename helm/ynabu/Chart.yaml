@@ -2,4 +2,4 @@ apiVersion: v2
 name: ynabu
 description: A Helm chart for YNABU
 version: 1.0.0
-appVersion: 1.0.0
+appVersion: ""
