@@ -1,4 +1,4 @@
-name: Image Release
+name: Image
 
 on:
   push:
