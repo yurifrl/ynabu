@@ -22,24 +22,18 @@ type Transaction struct {
 	err        error
 }
 
-func cleanPayeeName(payee string) string {
-	if idx := strings.LastIndex(payee, "/"); idx > 0 && idx-2 >= 0 {
-		payee = payee[:idx-2]
-	}
-	
-	// Remove numbers from specific payees
-	if strings.HasPrefix(payee, "DA EDP SP") {
-		payee = "DA EDP SP"
-	} else if strings.HasPrefix(payee, "MOBILE PAG TIT") {
-		payee = "MOBILE PAG TIT"
-	}
-	
-	return strings.Join(strings.Fields(payee), " ")
-}
-
 func NewTransaction(payee string) *Transaction {
+	if len(payee) > 5 && strings.Contains(payee[len(payee)-5:], "/") {
+		payee = strings.TrimSpace(payee[:len(payee)-5])
+	}
+	payee = strings.TrimSpace(payee)
+	if i := strings.LastIndexFunc(payee, func(r rune) bool {
+		return !('0' <= r && r <= '9')
+	}); i >= 0 && i < len(payee)-1 {
+		payee = strings.TrimSpace(payee[:i+1])
+	}
 	return &Transaction{
-		payee: cleanPayeeName(payee),
+		payee: strings.ToUpper(payee),
 	}
 }
 
@@ -71,7 +65,7 @@ func (t *Transaction) Build() (*Transaction, error) {
 	if t.docType == "fatura" {
 		t.memo = fmt.Sprintf("\"%s,%s,%s\"", t.genID(), t.cardType, t.cardNumber)
 	} else {
-		t.memo = fmt.Sprintf("\"%s,extrato,\"", t.genID())
+		t.memo = fmt.Sprintf("\"%s,extrato\"", t.genID())
 	}
 	return t, nil
 }
