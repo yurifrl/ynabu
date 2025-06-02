@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/charmbracelet/log"
 )
 
 type Transaction struct {
@@ -18,19 +16,17 @@ type Transaction struct {
 	docType    string
 	cardType   string
 	cardNumber string
-	logger     *log.Logger
 	err        error
 }
 
 func NewTransaction(payee string) *Transaction {
-	if len(payee) > 5 && strings.Contains(payee[len(payee)-5:], "/") {
-		payee = strings.TrimSpace(payee[:len(payee)-5])
-	}
-	payee = strings.TrimSpace(payee)
-	if i := strings.LastIndexFunc(payee, func(r rune) bool {
-		return !('0' <= r && r <= '9')
-	}); i >= 0 && i < len(payee)-1 {
-		payee = strings.TrimSpace(payee[:i+1])
+	// Remove date pattern from payee if it exists (format: DD/MM)
+	if len(payee) > 5 {
+		if match := strings.LastIndex(payee, "/"); match > 0 && match == len(payee)-3 {
+			if _, err := strconv.Atoi(payee[match-2:match] + payee[match+1:]); err == nil {
+				payee = strings.TrimSpace(payee[:match-2])
+			}
+		}
 	}
 	return &Transaction{
 		payee: strings.ToUpper(payee),
