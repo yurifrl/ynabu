@@ -9,27 +9,29 @@ import (
 )
 
 type Transaction struct {
-	date       string
-	payee      string
-	memo       string
-	amount     float64
-	docType    string
-	cardType   string
-	cardNumber string
-	err        error
+	date            string
+	payee           string
+	transformedPayee string
+	memo            string
+	amount          float64
+	docType         string
+	cardType        string
+	cardNumber      string
+	err             error
 }
 
 func NewTransaction(payee string) *Transaction {
-	// Remove date pattern from payee if it exists (format: DD/MM)
+	transformed := payee
 	if len(payee) > 5 {
 		if match := strings.LastIndex(payee, "/"); match > 0 && match == len(payee)-3 {
 			if _, err := strconv.Atoi(payee[match-2:match] + payee[match+1:]); err == nil {
-				payee = strings.TrimSpace(payee[:match-2])
+				transformed = strings.TrimSpace(payee[:match-2])
 			}
 		}
 	}
 	return &Transaction{
-		payee: strings.ToUpper(payee),
+		payee:           payee,
+		transformedPayee: strings.ToUpper(transformed),
 	}
 }
 
@@ -112,7 +114,7 @@ func (t *Transaction) Date() string {
 }
 
 func (t *Transaction) Payee() string {
-	return t.payee
+	return t.transformedPayee
 }
 
 func (t *Transaction) Memo() string {
