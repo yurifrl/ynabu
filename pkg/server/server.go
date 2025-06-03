@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -86,6 +87,10 @@ func (s *Server) handleConvert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to process file: %v", err), http.StatusBadRequest)
 		return
 	}
+
+	sort.Slice(transactions, func(i, j int) bool {
+		return transactions[i].Date() < transactions[j].Date()
+	})
 
 	filename := strings.TrimSuffix(header.Filename, filepath.Ext(header.Filename)) + "-ynabu.csv"
 	s.transactions.Store(filename, transactions)
