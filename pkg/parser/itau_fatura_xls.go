@@ -28,7 +28,6 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]*models.Transaction, error) 
 	var transactions []*models.Transaction
 	var cardType string
 	var cardNumber string
-	var foundTransactions bool
 
 	for _, row := range rows {
 		if len(row) < 4 {
@@ -42,19 +41,14 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]*models.Transaction, error) 
 			if matches := cardNumberRegex.FindStringSubmatch(text); len(matches) > 1 {
 				cardNumber = matches[1]
 			}
-			if strings.Contains(strings.ToLower(text), "(titular)") {
+			switch {
+			case strings.Contains(strings.ToLower(text), "(titular)"):
 				cardType = "titular"
-				foundTransactions = true
-				continue
-			}
-			if strings.Contains(strings.ToLower(text), "(adicional)") {
+			case strings.Contains(strings.ToLower(text), "(adicional)"):
 				cardType = "adicional"
-				foundTransactions = true
-				continue
+			default:
+				cardType = ""
 			}
-		}
-
-		if !foundTransactions {
 			continue
 		}
 
@@ -95,7 +89,6 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]*models.Transaction, error) 
 			SetDate(date).
 			Build()
 		if err != nil {
-			p.logger.Debug("error building transaction", "row", row, "error", err)
 			continue
 		}
 

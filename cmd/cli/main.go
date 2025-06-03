@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -162,6 +163,10 @@ func (p *FileProcessor) ProcessFile(inputPath, outputDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to process file: %w", err)
 	}
+
+	sort.Slice(transactions, func(i, j int) bool {
+		return transactions[i].Date() < transactions[j].Date()
+	})
 
 	outputBytes := csv.Create(transactions, p.filters.toFilterFunc())
 
