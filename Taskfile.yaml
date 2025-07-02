@@ -3,7 +3,7 @@ version: '3'
 tasks:
   build:
     cmds:
-      - go build -o ynabu cmd/cli/main.go
+      - go build -o ynabu cmd/cli/*.go
       - mv ynabu ~/.bin/
 
   tag-bump:
@@ -12,3 +12,7 @@ tasks:
       - awk -F. '{$1++;$2=0;$3=0;print $1"."$2"."$3}' VERSION > VERSION.tmp && mv VERSION.tmp VERSION
       - git tag v$(cat VERSION)
       - git push origin v$(cat VERSION)
+    
+  op-inject:
+    cmds:
+      - op inject --account=my.1password.com -f -i .env.op -o .env

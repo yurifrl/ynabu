@@ -10,4 +10,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
 FROM scratch
 COPY --from=builder /app/server /server
 COPY templates /templates
+EXPOSE 3000
 CMD ["/server"] 

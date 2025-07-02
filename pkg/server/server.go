@@ -12,15 +12,15 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/log"
+	"github.com/yurifrl/ynabu/pkg/config"
 	"github.com/yurifrl/ynabu/pkg/csv"
 	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/parser"
-	"github.com/yurifrl/ynabu/pkg/types"
 )
 
 // Server handles HTTP requests for YNAB file processing
 type Server struct {
-	config       types.Config
+	config       *config.Config
 	logger       *log.Logger
 	mux          *http.ServeMux
 	template     *template.Template
@@ -29,7 +29,7 @@ type Server struct {
 }
 
 // New creates a new HTTP server
-func New(config types.Config, logger *log.Logger) *Server {
+func New(config *config.Config, logger *log.Logger) *Server {
 	tmpl := template.Must(template.ParseGlob("templates/*.html"))
 	return &Server{
 		config:   config,

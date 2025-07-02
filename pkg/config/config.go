@@ -1,18 +1,45 @@
 package config
 
-import "github.com/yurifrl/ynabu/pkg/types"
+import (
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+)
 
-type DefaultConfig struct {
-	OutputPath string
+type Config struct {
+	Port string `mapstructure:"port"`
 }
 
-func (c *DefaultConfig) GetOutputPath() string {
-	return c.OutputPath
-}
-
-// New creates a new default configuration
-func New(outputPath string) types.Config {
-	return &DefaultConfig{
-		OutputPath: outputPath,
+// Load initialises a Viper instance, reads the config file (if any) and returns it.
+// No defaults or unmarshalling are performed here – this keeps I/O in one place.
+func Load(cfgFile string) (*viper.Viper, error) {
+	v := viper.New()
+	if cfgFile != "" {
+		v.SetConfigFile(cfgFile)
+	} else {
+		v.SetConfigName("config")
+		v.SetConfigType("yaml")
+		v.AddConfigPath(".")
 	}
+
+	// Ignore not-found error; caller can decide if it's fatal.
+	_ = v.ReadInConfig()
+	return v, nil
+}
+
+func Build(cfgFile string, fs *pflag.FlagSet) (*Config, error) {
+	v, err := Load(cfgFile)
+	if err != nil {
+		return nil, err
+	}
+	if fs != nil {
+		_ = v.BindPFlags(fs)
+	}
+	var c Config
+	if err := v.Unmarshal(&c); err != nil {
+		return nil, err
+	}
+	if c.Port == "" {
+		c.Port = "3000"
+	}
+	return &c, nil
 }
