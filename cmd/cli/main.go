@@ -96,14 +96,16 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "Config file (default is config.yaml)")
 
+	// Filter flags (global)
+	rootCmd.PersistentFlags().BoolVar(&cliFilters.print, "print", false, "Print to stdout instead of saving to file")
+	rootCmd.PersistentFlags().StringVar(&cliFilters.startDate, "start", "", "Start date (YYYY/MM/DD)")
+	rootCmd.PersistentFlags().StringVar(&cliFilters.endDate, "end", "", "End date (YYYY/MM/DD)")
+	rootCmd.PersistentFlags().Float64Var(&cliFilters.minAmount, "min", 0, "Minimum amount")
+	rootCmd.PersistentFlags().Float64Var(&cliFilters.maxAmount, "max", 0, "Maximum amount")
+	rootCmd.PersistentFlags().StringVar(&cliFilters.payee, "payee", "", "Filter by payee (case insensitive)")
+
 	// Flags specific to the convert subcommand
 	convertCmd.Flags().StringP("output", "o", "", "Output directory (default: same as input directory)")
-	convertCmd.Flags().BoolVar(&cliFilters.print, "print", false, "Print to stdout instead of saving to file")
-	convertCmd.Flags().StringVar(&cliFilters.startDate, "start", "", "Start date (YYYY/MM/DD)")
-	convertCmd.Flags().StringVar(&cliFilters.endDate, "end", "", "End date (YYYY/MM/DD)")
-	convertCmd.Flags().Float64Var(&cliFilters.minAmount, "min", 0, "Minimum amount")
-	convertCmd.Flags().Float64Var(&cliFilters.maxAmount, "max", 0, "Maximum amount")
-	convertCmd.Flags().StringVar(&cliFilters.payee, "payee", "", "Filter by payee (case insensitive)")
 	convertCmd.Flags().Bool("import", false, "Import mode (placeholder)")
 
 	rootCmd.AddCommand(convertCmd)
