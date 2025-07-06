@@ -66,34 +66,15 @@ func NewFileProcessor(logger *log.Logger, filters *filters) *FileProcessor {
 	}
 }
 
-func (p *FileProcessor) ProcessDirectory(inputDir, outputDir string) error {
-	entries, err := os.ReadDir(inputDir)
-	if err != nil {
-		return fmt.Errorf("failed to read directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		if err := p.ProcessFile(filepath.Join(inputDir, entry.Name()), outputDir); err != nil {
-			p.logger.Warn("error processing file", "error", err)
-		}
-	}
-
-	return nil
-}
-
-func (p *FileProcessor) ProcessFile(inputPath, _ string) error {
+func (p *FileProcessor) ProcessFile(inputPath string) (string, error) {
 	fileBytes, err := os.ReadFile(inputPath)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
 	transactions, err := p.parser.ProcessBytes(fileBytes, filepath.Base(inputPath))
 	if err != nil {
-		return fmt.Errorf("failed to process file: %w", err)
+		return "", fmt.Errorf("failed to process file: %w", err)
 	}
 
 	sort.Slice(transactions, func(i, j int) bool {
@@ -102,6 +83,5 @@ func (p *FileProcessor) ProcessFile(inputPath, _ string) error {
 
 	outputBytes := csv.Create(transactions, p.filters.toFilterFunc())
 
-	fmt.Print(string(outputBytes))
-	return nil
+	return string(outputBytes), nil
 }
