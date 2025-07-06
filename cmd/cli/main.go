@@ -10,9 +10,11 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/k0kubun/pp/v3"
 	"github.com/spf13/cobra"
+	"github.com/subosito/gotenv"
 
 	"github.com/yurifrl/ynabu/pkg/config"
 	"github.com/yurifrl/ynabu/pkg/csv"
+	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/parser"
 )
 
@@ -97,9 +99,15 @@ var planCmd = &cobra.Command{
 		cfg := cmd.Context().Value(configKey).(*config.Config)
 		file := cmd.Flag("file").Value.String()
 
+		manifest, err := models.FromFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to read manifest: %w", err)
+		}
+
 		logger.Debug("plan", "planPath", file)
 
 		pp.Println(cfg)
+		pp.Println(manifest)
 
 		return nil
 	},
@@ -125,6 +133,7 @@ func init() {
 }
 
 func main() {
+	gotenv.Load()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
