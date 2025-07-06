@@ -24,8 +24,9 @@ func (p *Parser) ParseItauExtratoTXT(data []byte) ([]*models.Transaction, error)
 		date := fields[0]
 		payee := fields[1]
 
-		transaction, err := models.NewTransaction(payee).
-			AsExtrato().
+		transaction, err := models.NewTransaction().
+			SetPayee(payee).
+			SetExtrato().
 			SetValueFromExtrato(value).
 			SetDate(date).
 			Build()

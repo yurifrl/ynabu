@@ -3,11 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
 	"github.com/yurifrl/ynabu/pkg/config"
+	"github.com/yurifrl/ynabu/pkg/csv"
+	"github.com/yurifrl/ynabu/pkg/parser"
 )
 
 var (
@@ -40,18 +44,29 @@ var convertCmd = &cobra.Command{
 			return err
 		}
 
-		processor := NewFileProcessor(logger, &cliFilters)
-
 		inputPath, err := cmd.Flags().GetString("file")
 		if err != nil {
 			return err
 		}
 
-		file, err := processor.ProcessFile(inputPath)
+		fileBytes, err := os.ReadFile(inputPath)
 		if err != nil {
-			logger.Warn("failed to process file", "error", err, "file", inputPath)
+			return fmt.Errorf("failed to read file: %w", err)
 		}
-		fmt.Println(file)
+
+		parser := parser.New(logger)
+		transactions, err := parser.ProcessBytes(fileBytes, filepath.Base(inputPath))
+		if err != nil {
+			return fmt.Errorf("failed to process file: %w", err)
+		}
+
+		sort.Slice(transactions, func(i, j int) bool {
+			return transactions[i].Date() < transactions[j].Date()
+		})
+
+		outputBytes := csv.Create(transactions, cliFilters.toFilterFunc())
+
+		fmt.Println(string(outputBytes))
 		return nil
 	},
 }

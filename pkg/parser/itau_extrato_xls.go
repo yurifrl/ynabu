@@ -41,8 +41,9 @@ func (p *Parser) ParseItauExtratoXLS(data []byte) ([]*models.Transaction, error)
 		payee := row[1]
 		value := row[3]
 
-		transaction, err := models.NewTransaction(payee).
-			AsExtrato().
+		transaction, err := models.NewTransaction().
+			SetPayee(payee).
+			SetExtrato().
 			SetValueFromExtrato(value).
 			SetDate(date).
 			Build()

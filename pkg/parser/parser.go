@@ -48,19 +48,21 @@ func (p *Parser) ProcessBytes(data []byte, filename string) ([]*models.Transacti
 
 func detectType(filename string) FileType {
 	lowerFilename := strings.ToLower(filename)
-	if strings.Contains(lowerFilename, "extrato conta corrente") {
-		if strings.HasSuffix(lowerFilename, ".xls") {
-			return ItauExtratoXLS
-		}
-		if strings.HasSuffix(lowerFilename, ".txt") {
-			return ItauExtratoTXT
-		}
-		if strings.HasSuffix(lowerFilename, ".ofx") {
-			return ItauExtratoOFX
-		}
-	}
+
+	// Prioritize explicit keywords when available
 	if strings.Contains(lowerFilename, "fatura") && strings.HasSuffix(lowerFilename, ".xls") {
 		return ItauFaturaXLS
 	}
+
+	if strings.HasSuffix(lowerFilename, ".txt") {
+		return ItauExtratoTXT
+	}
+	if strings.HasSuffix(lowerFilename, ".ofx") {
+		return ItauExtratoOFX
+	}
+	if strings.HasSuffix(lowerFilename, ".xls") {
+		return ItauExtratoXLS
+	}
+
 	return ""
 }

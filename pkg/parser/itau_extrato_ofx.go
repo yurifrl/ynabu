@@ -60,8 +60,9 @@ func (p *Parser) ParseItauExtratoOFX(data []byte) ([]*models.Transaction, error)
 		}
 
 		// Build transaction
-		tx, err := models.NewTransaction(memo).
-			AsExtrato().
+		tx, err := models.NewTransaction().
+			SetPayee(memo).
+			SetExtrato().
 			SetValueFromExtrato(amount).
 			SetDate(date).
 			Build()

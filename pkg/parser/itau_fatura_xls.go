@@ -83,8 +83,9 @@ func (p *Parser) ParseItauFaturaXLS(data []byte) ([]*models.Transaction, error) 
 		valueStr := row[3]
 
 		// Create transaction
-		transaction, err := models.NewTransaction(payee).
-			AsFatura(cardType, cardNumber).
+		transaction, err := models.NewTransaction().
+			SetPayee(payee).
+			SetFatura(cardType, cardNumber).
 			SetValueFromFatura(valueStr).
 			SetDate(date).
 			Build()

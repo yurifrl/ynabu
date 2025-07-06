@@ -20,9 +20,9 @@ func TestProcessBytes(t *testing.T) {
 		t.Fatalf("ProcessBytes failed: %v", err)
 	}
 
-	t1, _ := models.NewTransaction("PIX TRANSF ID_A15/03").AsExtrato().SetDate("17/03/2025").SetValueFromExtrato("-2327,00").Build()
-	t2, _ := models.NewTransaction("MOBILE PAG TIT 426XXXXXX").AsExtrato().SetDate("17/03/2025").SetValueFromExtrato("-287,00").Build()
-	t3, _ := models.NewTransaction("PIX TRANSF ID_C19/03").AsExtrato().SetDate("19/03/2025").SetValueFromExtrato("-1900,00").Build()
+	t1, _ := models.NewTransaction().SetPayee("PIX TRANSF ID_A15/03").SetExtrato().SetDate("17/03/2025").SetValueFromExtrato("-2327,00").Build()
+	t2, _ := models.NewTransaction().SetPayee("MOBILE PAG TIT 426XXXXXX").SetExtrato().SetDate("17/03/2025").SetValueFromExtrato("-287,00").Build()
+	t3, _ := models.NewTransaction().SetPayee("PIX TRANSF ID_C19/03").SetExtrato().SetDate("19/03/2025").SetValueFromExtrato("-1900,00").Build()
 	expected := []*models.Transaction{t1, t2, t3}
 
 	if len(output) != len(expected) {
