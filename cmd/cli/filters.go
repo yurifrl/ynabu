@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,7 +21,6 @@ type filters struct {
 	minAmount float64
 	maxAmount float64
 	payee     string
-	print     bool
 }
 
 type FileProcessor struct {
@@ -88,7 +85,7 @@ func (p *FileProcessor) ProcessDirectory(inputDir, outputDir string) error {
 	return nil
 }
 
-func (p *FileProcessor) ProcessFile(inputPath, outputDir string) error {
+func (p *FileProcessor) ProcessFile(inputPath, _ string) error {
 	fileBytes, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
@@ -105,30 +102,6 @@ func (p *FileProcessor) ProcessFile(inputPath, outputDir string) error {
 
 	outputBytes := csv.Create(transactions, p.filters.toFilterFunc())
 
-	if p.filters.print {
-		fmt.Print(string(outputBytes))
-		return nil
-	}
-
-	filename := filepath.Base(inputPath)
-	ext := filepath.Ext(filename)
-	name := strings.TrimSuffix(filename, ext)
-	outputPath := filepath.Join(outputDir, fmt.Sprintf("%s-ynabu%s.csv", name, ext))
-
-	if err := writeBytes(outputPath, outputBytes); err != nil {
-		return fmt.Errorf("failed to write output: %w", err)
-	}
-
+	fmt.Print(string(outputBytes))
 	return nil
-}
-
-func writeBytes(path string, data []byte) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = io.Copy(f, bytes.NewReader(data))
-	return err
 }

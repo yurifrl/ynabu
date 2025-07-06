@@ -8,6 +8,10 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
+	"github.com/yurifrl/ynabu/pkg/executor"
+	"github.com/yurifrl/ynabu/pkg/plan"
+	"github.com/yurifrl/ynabu/pkg/statement"
+
 	"github.com/yurifrl/ynabu/pkg/config"
 )
 
@@ -50,16 +54,8 @@ var convertCmd = &cobra.Command{
 			return nil
 		}
 
-		outputDir, _ := cmd.Flags().GetString("output")
-		if outputDir == "" {
-			outputDir = filepath.Dir(inputPath)
-		}
-
-		if !cliFilters.print {
-			if err := os.MkdirAll(outputDir, 0755); err != nil {
-				return err
-			}
-		}
+		// Output directory is no longer used; processing always prints to stdout.
+		outputDir := ""
 
 		processor := NewFileProcessor(logger, &cliFilters)
 
@@ -92,12 +88,49 @@ var convertCmd = &cobra.Command{
 	},
 }
 
+var planCmd = &cobra.Command{
+	Use:   "plan <plan_file>",
+	Short: "Preview a YAML plan of statements (dry-run)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		planPath := args[0]
+
+		p, err := plan.Load(planPath)
+		if err != nil {
+			return err
+		}
+
+		logger := log.NewWithOptions(os.Stderr, log.Options{Prefix: "ynabu-cli"})
+		exec := executor.New(logger)
+
+		var stmts []statement.Statement
+		for _, spec := range p.Statements {
+			st, err := statement.New(spec, p.YNAB, logger)
+			if err != nil {
+				return err
+			}
+			stmts = append(stmts, st)
+		}
+
+		fmt.Printf("Plan preview for %s\n", planPath)
+		p.Print()
+		changes, err := exec.Plan(stmts)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Summary of changes:")
+		for _, c := range changes {
+			fmt.Printf("  - statement %s -> account %s : create %d transactions\n", c.StatementID, c.AccountID, c.ToCreate)
+		}
+		return nil
+	},
+}
+
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "Config file (default is config.yaml)")
 
 	// Filter flags (global)
-	rootCmd.PersistentFlags().BoolVar(&cliFilters.print, "print", false, "Print to stdout instead of saving to file")
 	rootCmd.PersistentFlags().StringVar(&cliFilters.startDate, "start", "", "Start date (YYYY/MM/DD)")
 	rootCmd.PersistentFlags().StringVar(&cliFilters.endDate, "end", "", "End date (YYYY/MM/DD)")
 	rootCmd.PersistentFlags().Float64Var(&cliFilters.minAmount, "min", 0, "Minimum amount")
@@ -105,10 +138,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cliFilters.payee, "payee", "", "Filter by payee (case insensitive)")
 
 	// Flags specific to the convert subcommand
-	convertCmd.Flags().StringP("output", "o", "", "Output directory (default: same as input directory)")
 	convertCmd.Flags().Bool("import", false, "Import mode (placeholder)")
 
 	rootCmd.AddCommand(convertCmd)
+	rootCmd.AddCommand(planCmd)
 }
 
 func main() {
