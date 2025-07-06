@@ -1,12 +1,21 @@
 package config
 
 import (
+	"os"
+
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
+type YNABConfig struct {
+	AccountID string `mapstructure:"account_id"`
+	Token     string `mapstructure:"token"`
+}
+
 type Config struct {
-	Port string `mapstructure:"port"`
+	Port     string     `mapstructure:"port"`
+	LogLevel string     `mapstructure:"log_level"`
+	YNAB     YNABConfig `mapstructure:"ynab"`
 }
 
 // Load initialises a Viper instance, reads the config file (if any) and returns it.
@@ -41,5 +50,8 @@ func Build(cfgFile string, fs *pflag.FlagSet) (*Config, error) {
 	if c.Port == "" {
 		c.Port = "3000"
 	}
+
+	c.YNAB.Token = os.ExpandEnv(c.YNAB.Token)
+
 	return &c, nil
 }

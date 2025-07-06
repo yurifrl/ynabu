@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
 
+	"github.com/brunomvsouza/ynab.go"
 	"github.com/yurifrl/ynabu/pkg/config"
 	"github.com/yurifrl/ynabu/pkg/csv"
 	"github.com/yurifrl/ynabu/pkg/executors"
@@ -107,7 +108,9 @@ var planCmd = &cobra.Command{
 
 		logger.Debug("plan", "planPath", file)
 
-		exec := executors.New(logger, cfg)
+		ynabClient := ynab.NewClient(cfg.YNAB.Token)
+
+		exec := executors.New(logger, cfg, ynabClient)
 		err = exec.Plan(manifest)
 		if err != nil {
 			return fmt.Errorf("failed to plan: %w", err)

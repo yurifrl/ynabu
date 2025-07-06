@@ -1,6 +1,3 @@
-ynab:
-  account_id: a10ef71e-85c2-42d7-a008-262cf085911a
-  token_env: $YNAB_ACCESS_TOKEN
 statements:
   - type: extrato
     file: "~/Downloads/Extrato\ Conta\ Corrente-300620251932.xls"

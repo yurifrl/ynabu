@@ -54,9 +54,9 @@ func (t *Transaction) Build() (*Transaction, error) {
 
 	// Generate memo
 	if t.docType == "fatura" {
-		t.memo = fmt.Sprintf("\"%s,%s,%s\"", t.genID(), t.cardType, t.cardNumber)
+		t.memo = fmt.Sprintf("\"%s,%s,%s\"", t.ID(), t.cardType, t.cardNumber)
 	} else {
-		t.memo = fmt.Sprintf("\"%s,extrato\"", t.genID())
+		t.memo = fmt.Sprintf("\"%s,extrato\"", t.ID())
 	}
 	return t, nil
 }
@@ -97,7 +97,7 @@ func (t *Transaction) SetDate(date string) *Transaction {
 	return t
 }
 
-func (t *Transaction) genID() string {
+func (t *Transaction) ID() string {
 	data := fmt.Sprintf("%s-%s-%.2f", t.date, t.payee, t.amount)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:8])
