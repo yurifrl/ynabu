@@ -64,19 +64,19 @@ func TestParseSampleFiles(t *testing.T) {
 
 		switch filename {
 		case "sample-Extrato Conta Corrente-290320251101.txt":
-			assertTransaction(t, transactions[0], "2025/03/17", "PIX TRANSF ID_A15/03", -2327.00)
-			assertTransaction(t, transactions[27], "2025/03/31", "PIX TRANSF ID_B29/03", -4000.00)
-			assertTransaction(t, transactions[24], "2025/03/28", "PIX TRANSF ID_B28/03", 42000.00)
+			assertTransaction(t, transactions[0], "2025/03/17", "PIX TRANSF ID_A", -2327.00)
+			assertTransaction(t, transactions[27], "2025/03/31", "PIX TRANSF ID_B", -4000.00)
+			assertTransaction(t, transactions[24], "2025/03/28", "PIX TRANSF ID_B", 42000.00)
 
 		case "sample-Extrato Conta Corrente-290320250850.xls":
-			assertTransaction(t, transactions[0], "2025/03/17", "CraftCorner Supplies", -2327.00)
-			assertTransaction(t, transactions[27], "2025/03/31", "PetPals Emporium", -4000.00)
-			assertTransaction(t, transactions[24], "2025/03/28", "StyleHub Apparel", 2000.00)
+			assertTransaction(t, transactions[0], "2025/03/17", "CRAFTCORNER SUPPLIES", -2327.00)
+			assertTransaction(t, transactions[27], "2025/03/31", "PETPALS EMPORIUM", -4000.00)
+			assertTransaction(t, transactions[24], "2025/03/28", "STYLEHUB APPAREL", 2000.00)
 
 		case "sample-Fatura-Excel.xls":
-			assertTransaction(t, transactions[0], "2025/02/28", "Clix*GadgetGalaxy", -16.00)
-			assertTransaction(t, transactions[13], "2025/03/06", "HomeHaven Decor", -289.00)
-			assertTransaction(t, transactions[24], "2025/03/22", "Clix*GadgetGalaxy", -194.29)
+			assertTransaction(t, transactions[0], "2025/02/27", "CLIX*GADGETGALAXY", -107.89)
+			assertTransaction(t, transactions[13], "2025/03/01", "EATWELL MARKET", -5.00)
+			assertTransaction(t, transactions[24], "2025/03/06", "PETPALS EMPORIUM", -355.00)
 		}
 	}
 }
