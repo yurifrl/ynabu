@@ -1,13 +1,10 @@
 ynab:
-  budget_id: BUDGET_ID
+  account_id: a10ef71e-85c2-42d7-a008-262cf085911a
   token_env: $YNAB_ACCESS_TOKEN
-  accounts:
-    checking: ACC_CHECKING_ID
-    credit_card: ACC_CREDIT_ID
 statements:
   - type: extrato
     file: "~/Downloads/Extrato\ Conta\ Corrente-300620251932.xls"
-    account: checking
+    budget_id: c0b73d4c-fcb4-4cda-a3f5-cf1e29bd498b
   - type: fatura
     file: ~/Downloads/Fatura-Excel.xls
-    account: credit_card
+    budget_id: a06f5d5f-8272-4e5f-9e8e-c4ac09809d5a 

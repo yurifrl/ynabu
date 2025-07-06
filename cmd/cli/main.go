@@ -14,6 +14,7 @@ import (
 
 	"github.com/yurifrl/ynabu/pkg/config"
 	"github.com/yurifrl/ynabu/pkg/csv"
+	"github.com/yurifrl/ynabu/pkg/executors"
 	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/parser"
 )
@@ -106,8 +107,11 @@ var planCmd = &cobra.Command{
 
 		logger.Debug("plan", "planPath", file)
 
-		pp.Println(cfg)
-		pp.Println(manifest)
+		exec := executors.New(logger, cfg)
+		err = exec.Plan(manifest)
+		if err != nil {
+			return fmt.Errorf("failed to plan: %w", err)
+		}
 
 		return nil
 	},

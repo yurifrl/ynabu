@@ -16,16 +16,15 @@ type Manifest struct {
 
 // YNABConfig holds the YNAB specific configurations.
 type YNABConfig struct {
-	BudgetID string            `yaml:"budget_id"`
-	TokenEnv string            `yaml:"token_env"`
-	Accounts map[string]string `yaml:"accounts"`
+	AccountID string `yaml:"account_id"`
+	TokenEnv  string `yaml:"token_env"`
 }
 
 // Statement represents a single statement to be processed.
 type Statement struct {
-	Type    string `yaml:"type"`
-	File    string `yaml:"file"`
-	Account string `yaml:"account"`
+	Type     string `yaml:"type"`
+	File     string `yaml:"file"`
+	BudgetID string `yaml:"budget_id"`
 }
 
 // FromFile reads a manifest from a YAML file.
