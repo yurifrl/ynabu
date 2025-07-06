@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 
 	"github.com/charmbracelet/log"
+	"github.com/k0kubun/pp/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/yurifrl/ynabu/pkg/config"
@@ -17,13 +19,41 @@ import (
 var (
 	cliFilters filters
 	cfgFile    string
+	file       string
 )
+
+type contextKey string
+
+const (
+	loggerKey contextKey = "logger"
+	configKey contextKey = "config"
+)
+
+var _ = pp.Println
 
 var rootCmd = &cobra.Command{
 	Use:   "ynabu-cli",
 	Short: "YNABu command-line interface",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		logger := log.NewWithOptions(os.Stderr, log.Options{
+			ReportCaller:    true,
+			ReportTimestamp: true,
+			Prefix:          "ynabu-cli",
+			Level:           log.DebugLevel,
+		})
+
+		cfg, err := config.Build(cfgFile, cmd.Flags())
+		if err != nil {
+			return err
+		}
+
+		ctx := context.WithValue(cmd.Context(), loggerKey, logger)
+		ctx = context.WithValue(ctx, configKey, cfg)
+		cmd.SetContext(ctx)
+
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		// Show help when no subcommand is provided
 		return cmd.Help()
 	},
 }
@@ -33,29 +63,16 @@ var convertCmd = &cobra.Command{
 	Short: "Convert bank statements to YNAB CSV format",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		logger := log.NewWithOptions(os.Stderr, log.Options{
-			ReportCaller:    true,
-			ReportTimestamp: true,
-			Prefix:          "ynabu-cli",
-			Level:           log.DebugLevel,
-		})
+		logger := cmd.Context().Value(loggerKey).(*log.Logger)
+		file := cmd.Flag("file").Value.String()
 
-		if _, err := config.Build(cfgFile, cmd.Flags()); err != nil {
-			return err
-		}
-
-		inputPath, err := cmd.Flags().GetString("file")
-		if err != nil {
-			return err
-		}
-
-		fileBytes, err := os.ReadFile(inputPath)
+		fileBytes, err := os.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read file: %w", err)
 		}
 
 		parser := parser.New(logger)
-		transactions, err := parser.ProcessBytes(fileBytes, filepath.Base(inputPath))
+		transactions, err := parser.ProcessBytes(fileBytes, filepath.Base(file))
 		if err != nil {
 			return fmt.Errorf("failed to process file: %w", err)
 		}
@@ -72,15 +89,17 @@ var convertCmd = &cobra.Command{
 }
 
 var planCmd = &cobra.Command{
-	Use:   "plan <plan_file>",
+	Use:   "plan",
 	Short: "Preview a YAML plan of statements (dry-run)",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		planPath := args[0]
+		logger := cmd.Context().Value(loggerKey).(*log.Logger)
+		cfg := cmd.Context().Value(configKey).(*config.Config)
+		file := cmd.Flag("file").Value.String()
 
-		logger := log.NewWithOptions(os.Stderr, log.Options{Prefix: "ynabu-cli"})
+		logger.Debug("plan", "planPath", file)
 
-		logger.Debug("plan", "planPath", planPath)
+		pp.Println(cfg)
 
 		return nil
 	},
@@ -96,13 +115,13 @@ func init() {
 	rootCmd.PersistentFlags().Float64Var(&cliFilters.minAmount, "min", 0, "Minimum amount")
 	rootCmd.PersistentFlags().Float64Var(&cliFilters.maxAmount, "max", 0, "Maximum amount")
 	rootCmd.PersistentFlags().StringVar(&cliFilters.payee, "payee", "", "Filter by payee (case insensitive)")
-
-	// Flags specific to the convert subcommand
-	convertCmd.Flags().StringP("file", "f", "", "Input path (supports glob patterns)")
-	convertCmd.MarkFlagRequired("file")
+	rootCmd.PersistentFlags().StringVarP(&file, "file", "f", "", "Input path (supports glob patterns)")
 
 	rootCmd.AddCommand(convertCmd)
 	rootCmd.AddCommand(planCmd)
+
+	convertCmd.MarkFlagRequired("file")
+	planCmd.MarkFlagRequired("file")
 }
 
 func main() {
