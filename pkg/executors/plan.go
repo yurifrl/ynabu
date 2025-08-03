@@ -20,24 +20,26 @@ func (e *Executor) Plan(manifest *models.Manifest) error {
     for _, statement := range manifest.Statements {
         transactions, err := statement.Transactions(p)
         if err != nil {
-            return err
+            return err // early return: parsing failure
         }
 
-        var remoteTransactions []*ynab.Transaction
-        if statement.AccountID != "" {
-            e.logger.Debug("fetching remote transactions", "budget_id", e.config.YNAB.BudgetID, "account_id", statement.AccountID)
-            var err error
-            remoteTransactions, err = e.ynab.Transaction().GetTransactionsByAccount(e.config.YNAB.BudgetID, statement.AccountID, nil)
-            if err != nil {
-                e.logger.Error("failed to fetch remote transactions", "error", err)
-                return err
-            }
-            e.logger.Debug("fetched remote transactions", "count", len(remoteTransactions))
-        } else {
-            e.logger.Debug("account_id empty, skipping remote fetch")
-            remoteTransactions = []*ynab.Transaction{}
+        if statement.AccountID == "" {
+            return fmt.Errorf("manifest error: statement %s missing account_id", statement.FilePath)
         }
-		report := reconcile.Build(transactions, remoteTransactions, e.config.UseCustomID)
+
+        // Always initialise to an empty slice to avoid nil checks later.
+        remoteTransactions := []*ynab.Transaction{}
+
+        e.logger.Debug("fetching remote transactions", "budget_id", e.config.YNAB.BudgetID, "account_id", statement.AccountID)
+        remoteTransactions, err = e.ynab.Transaction().GetTransactionsByAccount(e.config.YNAB.BudgetID, statement.AccountID, nil)
+        if err != nil {
+            e.logger.Error("failed to fetch remote transactions", "error", err)
+            return err // early return: remote fetch failure
+        }
+        e.logger.Debug("fetched remote transactions", "count", len(remoteTransactions))
+
+        // Create a report of the plan.
+        report := reconcile.Build(transactions, remoteTransactions, e.config.UseCustomID)
         e.logger.Debug("processing plan report", "total", len(report.Items), "in_sync", report.InSyncCount(), "to_add", report.MissingCount())
 
         syncedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))  // gray
@@ -47,10 +49,11 @@ func (e *Executor) Plan(manifest *models.Manifest) error {
             if m.Status == reconcile.Synced {
                 line := fmt.Sprintf("%s | %-30s | %s | %s | R$ %.2f", m.Local.Date(), m.Local.Payee(), m.Local.ID(), m.Remote.CustomID(), m.Local.Amount())
                 fmt.Println(syncedStyle.Render("= " + line))
-            } else {
-                line := fmt.Sprintf("%s | %-30s | %s | %s | R$ %.2f", m.Local.Date(), m.Local.Payee(), m.Local.ID(), "xxxxxxxxxxxxxxxx", m.Local.Amount())
-                fmt.Println(addedStyle.Render("+ " + line))
+                continue // early continue: nothing to add
             }
+
+            line := fmt.Sprintf("%s | %-30s | %s | %s | R$ %.2f", m.Local.Date(), m.Local.Payee(), m.Local.ID(), "xxxxxxxxxxxxxxxx", m.Local.Amount())
+            fmt.Println(addedStyle.Render("+ " + line))
         }
 
         if report.MissingCount() == 0 {
