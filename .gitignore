@@ -1,7 +1,7 @@
 # ADHOC
-data/real/
-out/
-real-*
+hack/data/prod/
+prod-*
+config.prod.yaml
 
 # Binaries for programs and plugins
 *.exe

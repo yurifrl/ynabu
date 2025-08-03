@@ -67,7 +67,6 @@ func Build(cfgFile string, fs *pflag.FlagSet) (*Config, error) {
 	if cliLevel != "" {
 		c.LogLevel = cliLevel
 	}
-
 	if c.LogLevel == "" {
         c.LogLevel = "info"
     }

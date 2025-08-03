@@ -3,10 +3,10 @@ log-level: info
 use-custom-id: true
 
 ynab:
-  budget_id: a10ef71e-85c2-42d7-a008-262cf085911a
+  budget_id: 9730dbc6-ca95-4ce3-b310-93ec12f0aa3b
   token: $YNAB_ACCESS_TOKEN
   accounts:
-    - name: "Itau Conta Corrente"
-      id: "a06f5d5f-8272-4e5f-9e8e-c4ac09809d5a"
-    - name: "Itau Cartão"
-      id: "c0b73d4c-fcb4-4cda-a3f5-cf1e29bd498b"
+    - name: Checkings
+      id: dd4c395a-fdea-4fed-ae65-ac50ee29029a
+    - name: Credit Card
+      id: 6a779e63-5efe-4f89-99d8-a20c8c0976e7 
