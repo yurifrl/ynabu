@@ -22,14 +22,20 @@ func (e *Executor) Plan(manifest *models.Manifest) error {
             return err
         }
 
-        e.logger.Debug("fetching remote transactions", "budget_id", e.config.YNAB.BudgetID, "account_id", statement.AccountID)
-        remoteTransactions, err := e.ynab.Transaction().GetTransactionsByAccount(e.config.YNAB.BudgetID, statement.AccountID, nil)
-        if err != nil {
-            e.logger.Error("failed to fetch remote transactions", "error", err)
-            return err
+        var remoteTransactions []*ynab.Transaction
+        if statement.AccountID != "" {
+            e.logger.Debug("fetching remote transactions", "budget_id", e.config.YNAB.BudgetID, "account_id", statement.AccountID)
+            var err error
+            remoteTransactions, err = e.ynab.Transaction().GetTransactionsByAccount(e.config.YNAB.BudgetID, statement.AccountID, nil)
+            if err != nil {
+                e.logger.Error("failed to fetch remote transactions", "error", err)
+                return err
+            }
+            e.logger.Debug("fetched remote transactions", "count", len(remoteTransactions))
+        } else {
+            e.logger.Debug("account_id empty, skipping remote fetch")
+            remoteTransactions = []*ynab.Transaction{}
         }
-
-        e.logger.Debug("fetched remote transactions", "count", len(remoteTransactions))
 		e.showPlan(transactions, remoteTransactions)
     }
 

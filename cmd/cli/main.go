@@ -134,6 +134,37 @@ var planCmd = &cobra.Command{
 	},
 }
 
+var planStatementsCmd = &cobra.Command{
+    Use:   "statement",
+    Short: "Preview a plan for a single statement file (dry-run)",
+    Args:  cobra.NoArgs,
+    RunE: func(cmd *cobra.Command, args []string) error {
+        logger := cmd.Context().Value(loggerKey).(*log.Logger)
+        cfg := cmd.Context().Value(configKey).(*config.Config)
+
+        file := cmd.Flag("file").Value.String()
+        accountID := cmd.Flag("account-id").Value.String()
+
+        manifest := &models.Manifest{
+            Statements: []models.Statement{
+                {
+                    FilePath: file,
+                    AccountID: accountID,
+                },
+            },
+        }
+
+        ynabClient := ynab.New(cfg.YNAB.Token)
+        exec := executors.New(logger, cfg, ynabClient)
+
+        if err := exec.Plan(manifest); err != nil {
+            return fmt.Errorf("failed to plan: %w", err)
+        }
+
+        return nil
+    },
+}
+
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "Config file (default is config.yaml)")
@@ -149,6 +180,11 @@ func init() {
 
 	rootCmd.AddCommand(convertCmd)
 	rootCmd.AddCommand(planCmd)
+
+    planCmd.AddCommand(planStatementsCmd)
+    planStatementsCmd.Flags().StringP("account-id", "i", "", "YNAB account ID")
+    planStatementsCmd.MarkFlagRequired("file")
+    planStatementsCmd.MarkFlagRequired("account-id")
 
 	convertCmd.MarkFlagRequired("file")
 	planCmd.MarkFlagRequired("file")
