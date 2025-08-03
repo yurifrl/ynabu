@@ -15,7 +15,7 @@ type YNABConfig struct {
 type Config struct {
 	Port        string     `mapstructure:"port"`
 	LogLevel    string     `mapstructure:"log_level"`
-    UseCustomID bool      `mapstructure:"use_custom_id"`
+    UseCustomID bool       `mapstructure:"use_custom_id"`
 	YNAB        YNABConfig `mapstructure:"ynab"`
 }
 
@@ -44,10 +44,11 @@ func Build(cfgFile string, fs *pflag.FlagSet) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if fs != nil {
-		_ = v.BindPFlags(fs)
-	}
-	var c Config
+    if fs != nil {
+        // Bind all flags normally
+        _ = v.BindPFlags(fs)
+    }
+    var c Config
 	if err := v.Unmarshal(&c); err != nil {
 		return nil, err
 	}
@@ -65,12 +66,8 @@ func Build(cfgFile string, fs *pflag.FlagSet) (*Config, error) {
         c.LogLevel = "info"
     }
 
-    if !v.IsSet("use_custom_id") {
-        c.UseCustomID = true
-    }
-
-
-	c.YNAB.Token = os.ExpandEnv(c.YNAB.Token)
+    c.UseCustomID = v.GetBool("use-custom-id")
+    c.YNAB.Token = os.ExpandEnv(c.YNAB.Token)
 
 	return &c, nil
 }

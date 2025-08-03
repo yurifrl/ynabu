@@ -37,7 +37,7 @@ const (
 var _ = pp.Println
 
 var rootCmd = &cobra.Command{
-	Use:   "ynabu-cli",
+	Use:   "ynabu",
 	Short: "YNABu command-line interface",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Build(cfgFile, cmd.Flags())
@@ -61,9 +61,12 @@ var rootCmd = &cobra.Command{
 		logger := log.NewWithOptions(os.Stderr, log.Options{
 			ReportCaller:    true,
 			ReportTimestamp: true,
-			Prefix:          "ynabu-cli",
+			Prefix:          "ynabu",
 			Level:           lvl,
 		})
+
+		// Log effective configuration at debug level
+		logger.Info("config", "use_custom_id", cfg.UseCustomID, "log_level", cfg.LogLevel, "port", cfg.Port, "budget_id", cfg.YNAB.BudgetID)
 
 		ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 		ctx = context.WithValue(ctx, configKey, cfg)
@@ -169,6 +172,7 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "Config file (default is config.yaml)")
 	rootCmd.PersistentFlags().StringP("log-level", "l", "", "Log level (debug, info, warn, error)")
+    rootCmd.PersistentFlags().Bool("use-custom-id", true, "Match transactions by custom ID (default true; set to false to match by amount/date/payee)")
 
 	// Filter flags (global)
 	rootCmd.PersistentFlags().StringVar(&cliFilters.startDate, "start", "", "Start date (YYYY/MM/DD)")

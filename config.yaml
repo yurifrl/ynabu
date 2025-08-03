@@ -1,5 +1,6 @@
 port: 8080
-log_level: info
+log-level: info
+use-custom-id: true
 
 ynab:
   budget_id: a10ef71e-85c2-42d7-a008-262cf085911a

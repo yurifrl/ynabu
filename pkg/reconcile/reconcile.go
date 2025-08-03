@@ -8,7 +8,6 @@ package reconcile
 import (
 	"fmt"
 
-	"github.com/yurifrl/ynabu/pkg/compare"
 	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/ynab"
 )
@@ -52,7 +51,7 @@ type Report struct {
 
 // Build walks through local transactions and tries to find a corresponding
 // remote transaction.  Matching can be done by CustomID (memo-based) or by
-// value/date/payee using the compare.Equal helper.
+// value/date/payee matching.
 func Build(local []*models.Transaction, remote []*ynab.Transaction, useCustomID bool) *Report {
     items := make([]Entry, 0, len(local))
     toSync := make([]*models.Transaction, 0)
@@ -76,7 +75,11 @@ func Build(local []*models.Transaction, remote []*ynab.Transaction, useCustomID 
     } else {
         idx := make(map[string]*ynab.Transaction, len(remote))
         for _, rt := range remote {
-            key := fmt.Sprintf("%.2f|%s|%s", float64(rt.Amount)/1000.0, *rt.PayeeName, rt.Date.Format("2006/01/02"))
+            payee := ""
+            if rt.PayeeName != nil {
+                payee = *rt.PayeeName
+            }
+            key := fmt.Sprintf("%.2f|%s|%s", float64(rt.Amount)/1000.0, payee, rt.Date.Format("2006/01/02"))
             if _, ok := idx[key]; !ok {
                 idx[key] = rt
             }
@@ -84,7 +87,7 @@ func Build(local []*models.Transaction, remote []*ynab.Transaction, useCustomID 
         for _, lt := range local {
             key := fmt.Sprintf("%.2f|%s|%s", lt.Amount(), lt.Payee(), lt.Date())
             found := idx[key]
-            if found != nil && !compare.Equal(lt, found) {
+            if found != nil && !equal(lt, found) {
                 found = nil
             }
             status := ToAdd
@@ -99,6 +102,25 @@ func Build(local []*models.Transaction, remote []*ynab.Transaction, useCustomID 
     }
 
     return &Report{Items: items, toSync: toSync}
+}
+
+// equal compares a local transaction parsed from a statement with a remote
+// YNAB transaction using amount, payee, and date.
+func equal(local *models.Transaction, remote *ynab.Transaction) bool {
+    if local == nil || remote == nil {
+        return false
+    }
+    remoteAmount := float64(remote.Amount) / 1000.0
+    if fmt.Sprintf("%.2f", local.Amount()) != fmt.Sprintf("%.2f", remoteAmount) {
+        return false
+    }
+    if remote.PayeeName == nil || local.Payee() != *remote.PayeeName {
+        return false
+    }
+    if local.Date() != remote.Date.Format("2006/01/02") {
+        return false
+    }
+    return true
 }
 
 // InSyncCount returns how many local transactions are already present remotely.
