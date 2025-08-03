@@ -13,9 +13,10 @@ type YNABConfig struct {
 }
 
 type Config struct {
-	Port     string     `mapstructure:"port"`
-	LogLevel string     `mapstructure:"log_level"`
-	YNAB     YNABConfig `mapstructure:"ynab"`
+	Port        string     `mapstructure:"port"`
+	LogLevel    string     `mapstructure:"log_level"`
+    UseCustomID bool      `mapstructure:"use_custom_id"`
+	YNAB        YNABConfig `mapstructure:"ynab"`
 }
 
 // Load initialises a Viper instance, reads the config file (if any) and returns it.
@@ -61,8 +62,13 @@ func Build(cfgFile string, fs *pflag.FlagSet) (*Config, error) {
 	}
 
 	if c.LogLevel == "" {
-		c.LogLevel = "info"
-	}
+        c.LogLevel = "info"
+    }
+
+    if !v.IsSet("use_custom_id") {
+        c.UseCustomID = true
+    }
+
 
 	c.YNAB.Token = os.ExpandEnv(c.YNAB.Token)
 
