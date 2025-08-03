@@ -6,6 +6,8 @@ package reconcile
 // future frontend can reuse the same data-model.
 
 import (
+	"fmt"
+
 	"github.com/yurifrl/ynabu/pkg/compare"
 	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/ynab"
@@ -55,29 +57,44 @@ func Build(local []*models.Transaction, remote []*ynab.Transaction, useCustomID 
     items := make([]Entry, 0, len(local))
     toSync := make([]*models.Transaction, 0)
 
-    // Walk locals and find match in remotes using chosen strategy
-    for _, lt := range local {
-        var found *ynab.Transaction
+    if useCustomID {
+        idx := make(map[string]*ynab.Transaction, len(remote))
         for _, rt := range remote {
-            if useCustomID {
-                if rt.CustomID() == lt.ID() {
-                    found = rt
-                    break
-                }
-            } else {
-                if compare.Equal(lt, rt) {
-                    found = rt
-                    break
-                }
+            idx[rt.CustomID()] = rt
+        }
+        for _, lt := range local {
+            found := idx[lt.ID()]
+            status := ToAdd
+            if found != nil {
+                status = Synced
+            }
+            items = append(items, Entry{Local: lt, Remote: found, Status: status})
+            if status == ToAdd {
+                toSync = append(toSync, lt)
             }
         }
-        status := ToAdd
-        if found != nil {
-            status = Synced
+    } else {
+        idx := make(map[string]*ynab.Transaction, len(remote))
+        for _, rt := range remote {
+            key := fmt.Sprintf("%.2f|%s|%s", float64(rt.Amount)/1000.0, *rt.PayeeName, rt.Date.Format("2006/01/02"))
+            if _, ok := idx[key]; !ok {
+                idx[key] = rt
+            }
         }
-        items = append(items, Entry{Local: lt, Remote: found, Status: status})
-        if status == ToAdd {
-            toSync = append(toSync, lt)
+        for _, lt := range local {
+            key := fmt.Sprintf("%.2f|%s|%s", lt.Amount(), lt.Payee(), lt.Date())
+            found := idx[key]
+            if found != nil && !compare.Equal(lt, found) {
+                found = nil
+            }
+            status := ToAdd
+            if found != nil {
+                status = Synced
+            }
+            items = append(items, Entry{Local: lt, Remote: found, Status: status})
+            if status == ToAdd {
+                toSync = append(toSync, lt)
+            }
         }
     }
 
