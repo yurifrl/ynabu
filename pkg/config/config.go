@@ -8,8 +8,8 @@ import (
 )
 
 type YNABConfig struct {
-	AccountID string `mapstructure:"account_id"`
-	Token     string `mapstructure:"token"`
+	BudgetID string `mapstructure:"budget_id"`
+	Token    string `mapstructure:"token"`
 }
 
 type Config struct {
@@ -30,6 +30,9 @@ func Load(cfgFile string) (*viper.Viper, error) {
 		v.AddConfigPath(".")
 	}
 
+	// Environment variables take precedence over config file values.
+	v.AutomaticEnv()
+
 	// Ignore not-found error; caller can decide if it's fatal.
 	_ = v.ReadInConfig()
 	return v, nil
@@ -49,6 +52,16 @@ func Build(cfgFile string, fs *pflag.FlagSet) (*Config, error) {
 	}
 	if c.Port == "" {
 		c.Port = "3000"
+	}
+
+	// CLI flag overrides config file / env
+	cliLevel := v.GetString("log-level")
+	if cliLevel != "" {
+		c.LogLevel = cliLevel
+	}
+
+	if c.LogLevel == "" {
+		c.LogLevel = "info"
 	}
 
 	c.YNAB.Token = os.ExpandEnv(c.YNAB.Token)

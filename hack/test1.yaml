@@ -1,7 +1,7 @@
 statements:
-  - type: extrato
-    file: "~/Downloads/Extrato\ Conta\ Corrente-300620251932.xls"
-    budget_id: c0b73d4c-fcb4-4cda-a3f5-cf1e29bd498b
-  - type: fatura
-    file: ~/Downloads/Fatura-Excel.xls
-    budget_id: a06f5d5f-8272-4e5f-9e8e-c4ac09809d5a 
+  - parser_type: extrato
+    file: "./data/real/Extrato\ Conta\ Corrente-300620251932.xls"
+    account_id: c0b73d4c-fcb4-4cda-a3f5-cf1e29bd498b
+  - parser_type: fatura
+    file: ./data/real/Fatura-Excel.xls
+    account_id: a06f5d5f-8272-4e5f-9e8e-c4ac09809d5a 

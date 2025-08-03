@@ -6,18 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/charmbracelet/log"
 	"github.com/k0kubun/pp/v3"
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
 
-	"github.com/brunomvsouza/ynab.go"
 	"github.com/yurifrl/ynabu/pkg/config"
 	"github.com/yurifrl/ynabu/pkg/csv"
 	"github.com/yurifrl/ynabu/pkg/executors"
 	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/parser"
+	"github.com/yurifrl/ynabu/pkg/ynab"
 )
 
 var (
@@ -39,17 +40,30 @@ var rootCmd = &cobra.Command{
 	Use:   "ynabu-cli",
 	Short: "YNABu command-line interface",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		logger := log.NewWithOptions(os.Stderr, log.Options{
-			ReportCaller:    true,
-			ReportTimestamp: true,
-			Prefix:          "ynabu-cli",
-			Level:           log.DebugLevel,
-		})
-
 		cfg, err := config.Build(cfgFile, cmd.Flags())
 		if err != nil {
 			return err
 		}
+
+		// Determine log level, defaulting to info
+		lvl := log.InfoLevel
+		switch strings.ToLower(cfg.LogLevel) {
+		case "debug":
+			lvl = log.DebugLevel
+		case "info":
+			lvl = log.InfoLevel
+		case "warn", "warning":
+			lvl = log.WarnLevel
+		case "error":
+			lvl = log.ErrorLevel
+		}
+
+		logger := log.NewWithOptions(os.Stderr, log.Options{
+			ReportCaller:    true,
+			ReportTimestamp: true,
+			Prefix:          "ynabu-cli",
+			Level:           lvl,
+		})
 
 		ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 		ctx = context.WithValue(ctx, configKey, cfg)
@@ -108,7 +122,7 @@ var planCmd = &cobra.Command{
 
 		logger.Debug("plan", "planPath", file)
 
-		ynabClient := ynab.NewClient(cfg.YNAB.Token)
+		ynabClient := ynab.New(cfg.YNAB.Token)
 
 		exec := executors.New(logger, cfg, ynabClient)
 		err = exec.Plan(manifest)
@@ -123,6 +137,7 @@ var planCmd = &cobra.Command{
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "Config file (default is config.yaml)")
+	rootCmd.PersistentFlags().StringP("log-level", "l", "", "Log level (debug, info, warn, error)")
 
 	// Filter flags (global)
 	rootCmd.PersistentFlags().StringVar(&cliFilters.startDate, "start", "", "Start date (YYYY/MM/DD)")

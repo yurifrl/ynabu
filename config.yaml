@@ -1,6 +1,6 @@
 port: 8080
-log_level: debug
+log_level: info
 
 ynab:
-  account_id: a10ef71e-85c2-42d7-a008-262cf085911a
+  budget_id: a10ef71e-85c2-42d7-a008-262cf085911a
   token: $YNAB_ACCESS_TOKEN
