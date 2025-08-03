@@ -1,119 +1,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>YNABU</title>
+    <title>YNABU Reconcile</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         body { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px; }
+        input[type="text"], input[type="password"] { padding: 6px 10px; width: 220px; }
         .error { color: red; }
         .success { color: green; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f5f5f5; }
-        .amount { text-align: right; }
-        .amount.negative { color: red; }
-        .amount.positive { color: green; }
-        .actions { margin: 20px 0; display: flex; gap: 10px; }
-        .copy-feedback { opacity: 0; transition: opacity 0.3s; margin-left: 10px; }
-        .copy-feedback.show { opacity: 1; }
+        pre { background: #f7f7f7; padding: 10px; }
+        .added { color: green; }
+        .synced { color: #555; }
     </style>
 </head>
 <body>
-    <h1>YNABU - YNAB Bank Statement Converter</h1>
-    <form hx-post="/api/convert" 
+    <h1>YNABU – Reconcile</h1>
+
+    <header>
+        <input id="token"   name="token"      type="password" placeholder="YNAB Token"      title="Personal Access Token">
+        <input id="budget"  name="budget_id"  type="text"     placeholder="Budget ID"       title="Budget ID">
+        <input id="account" name="account_id" type="text"     placeholder="Account ID"      title="Account ID">
+    </header>
+
+    <form id="reconcile-form"
+          hx-post="/api/reconcile"
           hx-encoding="multipart/form-data"
           hx-trigger="change from:input[type=file]"
-          hx-target="#result">
-        <input type="file" name="statement" accept=".txt,.xls" required>
+          hx-target="#result"
+          hx-include="#token,#budget,#account">
+        <input type="file" name="statement" accept=".txt,.xls,.ofx" required>
     </form>
+
     <div id="result"></div>
-    <template id="success-template">
-        <div class="result-container">
-            <div class="actions">
-                <a href="" class="download-link">Download CSV</a>
-                <button onclick="copyToClipboard(this)" class="copy-btn">Copy CSV</button>
-                <span class="copy-feedback">✓ Copied!</span>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Payee</th>
-                        <th>Amount</th>
-                        <th>Memo</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </template>
+
     <script>
-        function formatAmount(amount) {
-            return new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL'
-            }).format(amount);
+        // Persist credentials in localStorage
+        function persist(id) {
+            const el = document.getElementById(id);
+            el.value = localStorage.getItem(id) || "";
+            el.addEventListener('input', () => localStorage.setItem(id, el.value));
         }
+        ['token','budget','account'].forEach(persist);
 
-        function copyToClipboard(btn) {
-            const container = btn.closest('.result-container');
-            if (!container) return;
-            
-            const table = container.querySelector('table');
-            if (!table) return;
-            
-            const rows = Array.from(table.querySelectorAll('tr'));
-            const csvContent = rows.map(row => {
-                return Array.from(row.cells || row.querySelectorAll('th'))
-                    .map(cell => {
-                        let text = cell.textContent.trim();
-                        if (cell.classList.contains('amount')) {
-                            text = cell.dataset.rawAmount;
-                        }
-                        if (text.includes(',') || text.includes('"')) {
-                            text = '"' + text.replace(/"/g, '""') + '"';
-                        }
-                        return text;
-                    })
-                    .join(',');
-            }).join('\n');
 
-            navigator.clipboard.writeText(csvContent).then(() => {
-                const feedback = container.querySelector('.copy-feedback');
-                if (feedback) {
-                    feedback.classList.add('show');
-                    setTimeout(() => feedback.classList.remove('show'), 2000);
-                }
-            });
-        }
 
+        // Handle response to show diff
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.successful && evt.detail.target.id === 'result') {
                 try {
                     const response = JSON.parse(evt.detail.xhr.response);
                     if (response.status === 'success') {
-                        const template = document.getElementById('success-template');
-                        const clone = template.content.cloneNode(true);
-                        const link = clone.querySelector('.download-link');
-                        link.href = '/api/files/' + response.file;
-                        
-                        const tbody = clone.querySelector('tbody');
-                        response.data.forEach(tx => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${tx.date}</td>
-                                <td>${tx.payee}</td>
-                                <td class="amount ${tx.amount < 0 ? 'negative' : ''}" data-raw-amount="${tx.amount}">${formatAmount(tx.amount)}</td>
-                                <td>${tx.memo}</td>
-                            `;
-                            tbody.appendChild(row);
-                        });
+                        const pre = document.createElement('pre');
+                        pre.innerHTML = response.lines.map(l => {
+                            if (l.startsWith('+')) {
+                                return '<span class="added">' + l + '</span>';
+                            }
+                            return '<span class="synced">' + l + '</span>';
+                        }).join('\n');
+
+                        const summary = document.createElement('p');
+                        summary.textContent = `Plan: ${response.to_add} transaction(s) will be added, ${response.in_sync} already in sync`;
 
                         evt.detail.target.innerHTML = '';
-                        evt.detail.target.appendChild(clone);
+                        evt.detail.target.appendChild(pre);
+                        evt.detail.target.appendChild(summary);
                         return;
                     }
-                } catch (e) {}
+                } catch (e) {
+                    console.error(e);
+                }
             }
             if (evt.detail.failed) {
                 evt.detail.target.innerHTML = '<div class="error">' + evt.detail.xhr.responseText + '</div>';
@@ -121,4 +77,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
