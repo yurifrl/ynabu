@@ -7,9 +7,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+type Account struct {
+    Name string `mapstructure:"name"`
+    ID   string `mapstructure:"id"`
+}
+
 type YNABConfig struct {
 	BudgetID string `mapstructure:"budget_id"`
 	Token    string `mapstructure:"token"`
+    Accounts []Account `mapstructure:"accounts"`
 }
 
 type Config struct {

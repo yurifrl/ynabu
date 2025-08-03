@@ -6,33 +6,90 @@
     <style>
         body { max-width: 1200px; margin: 0 auto; padding: 20px; }
         header { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px; }
-        input[type="text"], input[type="password"] { padding: 6px 10px; width: 220px; }
+        header.config input[type="text"], header.config input[type="password"] { padding: 4px 8px; width: 260px; font-family: monospace; font-size: 13px; }
+        .config-field { display: flex; flex-direction: column; font-size: 12px; }
+        .config-field label { margin-bottom: 2px; color: #666; }
         .error { color: red; }
         .success { color: green; }
         pre { background: #f7f7f7; padding: 10px; }
         .added { color: green; }
         .synced { color: #555; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f5f5f5; }
+        .amount { text-align: right; }
+        .amount.negative { color: red; }
+        .amount.positive { color: green; }
+        .actions { margin: 20px 0; display: flex; gap: 10px; }
+        .copy-feedback { opacity: 0; transition: opacity 0.3s; margin-left: 10px; }
+        .copy-feedback.show { opacity: 1; }
+        #upload-label {
+            display: block;
+            width: 100%;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 60px 20px;
+            text-align: center;
+            border: 2px dashed #aaa;
+            background: #f5f5f5;
+            cursor: pointer;
+            font-size: 24px;
+        }
+        #upload-label:hover { background: #eee; }
     </style>
 </head>
 <body>
-    <h1>YNABU – Reconcile</h1>
+    <h1>YNABU</h1>
 
-    <header>
-        <input id="token"   name="token"      type="password" placeholder="YNAB Token"      title="Personal Access Token">
-        <input id="budget"  name="budget_id"  type="text"     placeholder="Budget ID"       title="Budget ID">
-        <input id="account" name="account_id" type="text"     placeholder="Account ID"      title="Account ID">
+    <header class="config">
+        <div class="config-field">
+            <label for="token">Token</label>
+            <input id="token" name="token" type="password" placeholder="Personal Access Token" title="Personal Access Token">
+        </div>
+        <div class="config-field">
+            <label for="account">Account</label>
+            <select id="account" name="account_id">
+                <option value="">Choose account</option>
+                {{range .Accounts}}
+                    <option value="{{.ID}}">{{.Name}}</option>
+                {{end}}
+            </select>
+        </div>
     </header>
 
+
+    <!-- Single file input -->
+    <label for="statement" id="upload-label">Choose statement file</label>
+    <input id="statement" type="file" name="statement" accept=".txt,.xls,.ofx" required style="display:none">
+
     <form id="reconcile-form"
-          hx-post="/api/reconcile"
+          hx-post="/api/process"
           hx-encoding="multipart/form-data"
-          hx-trigger="change from:input[type=file]"
+          hx-trigger="change from:#statement, change from:#account"
           hx-target="#result"
-          hx-include="#token,#budget,#account">
-        <input type="file" name="statement" accept=".txt,.xls,.ofx" required>
+          hx-include="#token,#account,#statement">
     </form>
 
     <div id="result"></div>
+
+    <template id="csv-success-template">
+        <div class="result-container">
+            <div class="actions">
+                <a href="" class="download-link">Download CSV</a>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Payee</th>
+                        <th>Amount</th>
+                        <th>Memo</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </template>
 
     <script>
         // Persist credentials in localStorage
@@ -41,37 +98,93 @@
             el.value = localStorage.getItem(id) || "";
             el.addEventListener('input', () => localStorage.setItem(id, el.value));
         }
-        ['token','budget','account'].forEach(persist);
+        ['token'].forEach(persist);
+
+        // Persist account select to localStorage
+        const accountSelect = document.getElementById('account');
+        accountSelect.value = localStorage.getItem('account') || "";
+        accountSelect.addEventListener('change', () => {
+            localStorage.setItem('account', accountSelect.value);
+            if (fileInput.files && fileInput.files.length) {
+                // Manually trigger the form request so the diff refreshes
+                htmx.trigger(accountSelect, 'change');
+            }
+        });
+
+        // Update file label on selection
+        const fileInput = document.getElementById('statement');
+        const fileLabel = document.getElementById('upload-label');
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files && fileInput.files.length) {
+                fileLabel.textContent = fileInput.files[0].name;
+            } else {
+                fileLabel.textContent = 'Choose statement file';
+            }
+        });
 
 
 
-        // Handle response to show diff
+                // Handle response to show diff and CSV
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.successful && evt.detail.target.id === 'result') {
+                // Clear previous results
+                evt.detail.target.innerHTML = '';
                 try {
                     const response = JSON.parse(evt.detail.xhr.response);
                     if (response.status === 'success') {
-                        const pre = document.createElement('pre');
-                        pre.innerHTML = response.lines.map(l => {
-                            if (l.startsWith('+')) {
-                                return '<span class="added">' + l + '</span>';
-                            }
-                            return '<span class="synced">' + l + '</span>';
-                        }).join('\n');
-
+                        // Summary line
                         const summary = document.createElement('p');
                         summary.textContent = `Plan: ${response.to_add} transaction(s) will be added, ${response.in_sync} already in sync`;
-
-                        evt.detail.target.innerHTML = '';
-                        evt.detail.target.appendChild(pre);
                         evt.detail.target.appendChild(summary);
+
+                        // Table template
+                        const template = document.getElementById('csv-success-template');
+                        const clone = template.content.cloneNode(true);
+                        const link = clone.querySelector('.download-link');
+                        link.href = '/api/files/' + response.file;
+                        const tbody = clone.querySelector('tbody');
+
+                        if (response.lines && response.lines.length) {
+                            // Build diff table rows (+ added, = synced)
+                            response.lines.forEach(l => {
+                                const trimmed = l.trim();
+                                const prefix = trimmed.charAt(0);
+                                const content = trimmed.substring(2); // drop prefix and space
+                                const parts = content.split('|').map(p => p.trim());
+                                if (parts.length >= 3) {
+                                    const row = document.createElement('tr');
+                                    row.className = prefix === '+' ? 'added' : 'synced';
+                                    row.innerHTML = `
+                                        <td>${parts[0]}</td>
+                                        <td>${parts[1]}</td>
+                                        <td class="amount">${parts[2]}</td>
+                                        <td></td>
+                                    `;
+                                    tbody.appendChild(row);
+                                }
+                            });
+                        } else {
+                            // Fallback: show CSV rows only
+                            response.data.forEach(tx => {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${tx.date}</td>
+                                    <td>${tx.payee}</td>
+                                    <td class="amount ${tx.amount < 0 ? 'negative' : ''}" data-raw-amount="${tx.amount}">${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.amount)}</td>
+                                    <td>${tx.memo}</td>
+                                `;
+                                tbody.appendChild(row);
+                            });
+                        }
+
+                        evt.detail.target.appendChild(clone);
                         return;
                     }
                 } catch (e) {
                     console.error(e);
                 }
             }
-            if (evt.detail.failed) {
+            if (evt.detail.failed && evt.detail.target.id === 'result') {
                 evt.detail.target.innerHTML = '<div class="error">' + evt.detail.xhr.responseText + '</div>';
             }
         });
