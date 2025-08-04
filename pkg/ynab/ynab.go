@@ -71,7 +71,16 @@ func (ts *TransactionService) GetTransactionsByAccount(budgetID, accountID strin
 	}
 
 	return transactions, nil
-} 
+}
+
+// CreateTransactions creates multiple transactions in one API call
+func (ts *TransactionService) CreateTransactions(budgetID string, payloads []transaction.PayloadTransaction) error {
+    if len(payloads) == 0 {
+        return nil
+    }
+    _, err := ts.original.CreateTransactions(budgetID, payloads)
+    return err
+}
 
 func (t *Transaction) CustomID() string {
 	return t.customID

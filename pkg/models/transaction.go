@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/brunomvsouza/ynab.go/api"
 )
 
 type Transaction struct {
@@ -124,5 +126,35 @@ func (t *Transaction) Memo() string {
 }
 
 func (t *Transaction) Amount() float64 {
-	return t.amount
+    return t.amount
+}
+
+// PayeePointer returns a pointer to the formatted payee or nil when empty.
+func (t *Transaction) PayeePointer() *string {
+    p := t.Payee()
+    if p == "" {
+        return nil
+    }
+    return &p
+}
+
+// MemoPointer returns a pointer to the memo or nil when empty.
+func (t *Transaction) MemoPointer() *string {
+    if t.memo == "" {
+        return nil
+    }
+    m := t.memo
+        return &m
+}
+
+// APIDate converts the internal date string (yyyy/mm/dd) into an api.Date
+// understood by the YNAB SDK.
+func (t *Transaction) APIDate() (api.Date, error) {
+    return api.DateFromString(strings.ReplaceAll(t.date, "/", "-"))
+}
+
+// AmountMilliunits converts the float amount into the integer milliunits used
+// by the YNAB API (1000 milliunits == 1 currency unit).
+func (t *Transaction) AmountMilliunits() int64 {
+    return int64(t.amount * 1000)
 }

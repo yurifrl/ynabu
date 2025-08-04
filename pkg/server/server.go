@@ -15,9 +15,9 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/yurifrl/ynabu/pkg/config"
+	"github.com/yurifrl/ynabu/pkg/executors"
 	"github.com/yurifrl/ynabu/pkg/models"
 	"github.com/yurifrl/ynabu/pkg/parser"
-	"github.com/yurifrl/ynabu/pkg/reconcile"
 	"github.com/yurifrl/ynabu/pkg/ynab"
 )
 
@@ -119,11 +119,11 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
             http.Error(w, fmt.Sprintf("Failed to fetch remote transactions: %v", err), http.StatusInternalServerError)
             return
         }
-        report := reconcile.Build(localTxs, remoteTxs, s.config.UseCustomID)
+        report := executors.BuildReport(localTxs, remoteTxs, s.config.UseCustomID)
         lines = make([]string, 0, len(report.Items))
         for _, entry := range report.Items {
             prefix := "="
-            if entry.Status == reconcile.ToAdd {
+            if entry.Status == executors.ToAdd {
                 prefix = "+"
             }
             line := fmt.Sprintf("%s %s | %-30s | R$ %.2f", prefix, entry.Local.Date(), entry.Local.Payee(), entry.Local.Amount())

@@ -6,47 +6,39 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/k0kubun/pp/v3"
 	"github.com/yurifrl/ynabu/pkg/models"
-	"github.com/yurifrl/ynabu/pkg/parser"
-	"github.com/yurifrl/ynabu/pkg/reconcile"
-	"github.com/yurifrl/ynabu/pkg/ynab"
 )
 
 var _ = pp.Println
 
 func (e *Executor) Plan(manifest *models.Manifest) error {
     e.logger.Debug("planning manifest")
-    p := parser.New(e.logger)
 
     for _, statement := range manifest.Statements {
-        transactions, err := statement.Transactions(p)
-        if err != nil {
-            return err // early return: parsing failure
-        }
+		// Parse local transactions
+		localTxs, err := statement.Transactions(e.parser)
+		if err != nil {
+			return err
+		}
 
-        if statement.AccountID == "" {
-            return fmt.Errorf("manifest error: statement %s missing account_id", statement.FilePath)
-        }
+		if statement.AccountID == "" {
+			return fmt.Errorf("manifest error: statement %s missing account_id", statement.FilePath)
+		}
 
-        // Always initialise to an empty slice to avoid nil checks later.
-        remoteTransactions := []*ynab.Transaction{}
+		// Fetch remote transactions for the account
+		remoteTxs, err := e.ynab.Transaction().GetTransactionsByAccount(e.config.YNAB.BudgetID, statement.AccountID, nil)
+		if err != nil {
+			return err
+		}
 
-        e.logger.Debug("fetching remote transactions", "budget_id", e.config.YNAB.BudgetID, "account_id", statement.AccountID)
-        remoteTransactions, err = e.ynab.Transaction().GetTransactionsByAccount(e.config.YNAB.BudgetID, statement.AccountID, nil)
-        if err != nil {
-            e.logger.Error("failed to fetch remote transactions", "error", err)
-            return err // early return: remote fetch failure
-        }
-        e.logger.Debug("fetched remote transactions", "count", len(remoteTransactions))
+		report := BuildReport(localTxs, remoteTxs, e.config.UseCustomID)
 
-        // Create a report of the plan.
-        report := reconcile.Build(transactions, remoteTransactions, e.config.UseCustomID)
         e.logger.Debug("processing plan report", "total", len(report.Items), "in_sync", report.InSyncCount(), "to_add", report.MissingCount())
 
         syncedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))  // gray
         addedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))  // green
 
         for _, m := range report.Items {
-            if m.Status == reconcile.Synced {
+            if m.Status == Synced {
                 line := fmt.Sprintf("%s | %-30s | %s | %s | R$ %.2f", m.Local.Date(), m.Local.Payee(), m.Local.ID(), m.Remote.CustomID(), m.Local.Amount())
                 fmt.Println(syncedStyle.Render("= " + line))
                 continue // early continue: nothing to add

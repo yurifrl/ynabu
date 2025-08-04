@@ -109,6 +109,108 @@ var convertCmd = &cobra.Command{
 	},
 }
 
+var applyCmd = &cobra.Command{
+    Use:   "apply",
+    Short: "Apply a YAML plan of statements (creates missing transactions)",
+    Args:  cobra.NoArgs,
+    RunE: func(cmd *cobra.Command, args []string) error {
+        logger := cmd.Context().Value(loggerKey).(*log.Logger)
+        cfg := cmd.Context().Value(configKey).(*config.Config)
+        manifestPath := cmd.Flag("file").Value.String()
+        autoApprove, _ := cmd.Flags().GetBool("auto-approve")
+        accountID := cmd.Flag("account-id").Value.String()
+
+        var manifest *models.Manifest
+        if strings.HasSuffix(manifestPath, ".yaml") || strings.HasSuffix(manifestPath, ".yml") {
+            // full manifest
+            mf, err := models.FromFile(manifestPath)
+            if err != nil {
+                return fmt.Errorf("failed to read manifest: %w", err)
+            }
+            manifest = mf
+        } else {
+            // treat as single statement CSV; need account ID
+            if accountID == "" {
+                return fmt.Errorf("--account-id is required when applying a single statement file")
+            }
+            manifest = &models.Manifest{
+                Statements: []models.Statement{{FilePath: manifestPath, AccountID: accountID}},
+            }
+        }
+
+        ynabClient := ynab.New(cfg.YNAB.Token)
+        exec := executors.New(logger, cfg, ynabClient)
+
+        // Always show the plan first
+        if err := exec.Plan(manifest); err != nil {
+            return fmt.Errorf("plan failed: %w", err)
+        }
+
+        if !autoApprove {
+            fmt.Println("Do you want to perform these actions?")
+            fmt.Println("  Only 'yes' will be accepted to approve.")
+            fmt.Print("Enter a value: ")
+            var input string
+            fmt.Scanln(&input)
+            input = strings.ToLower(strings.TrimSpace(input))
+            if input != "yes" {
+                logger.Info("aborted by user")
+                return nil
+            }
+        }
+
+        if err := exec.Apply(manifest); err != nil {
+            return fmt.Errorf("apply failed: %w", err)
+        }
+        logger.Info("apply completed successfully")
+        return nil
+    },
+}
+
+var applyStatementCmd = &cobra.Command{
+    Use:   "statement",
+    Short: "Apply a single statement file",
+    Args:  cobra.NoArgs,
+    RunE: func(cmd *cobra.Command, args []string) error {
+        logger := cmd.Context().Value(loggerKey).(*log.Logger)
+        cfg := cmd.Context().Value(configKey).(*config.Config)
+
+        filePath := cmd.Flag("file").Value.String()
+        accountID := cmd.Flag("account-id").Value.String()
+        autoApprove, _ := cmd.Flags().GetBool("auto-approve")
+
+        manifest := &models.Manifest{
+            Statements: []models.Statement{{FilePath: filePath, AccountID: accountID}},
+        }
+
+        ynabClient := ynab.New(cfg.YNAB.Token)
+        exec := executors.New(logger, cfg, ynabClient)
+
+        if err := exec.Plan(manifest); err != nil {
+            return fmt.Errorf("plan failed: %w", err)
+        }
+
+        if !autoApprove {
+            fmt.Println("Do you want to perform these actions?")
+            fmt.Println("  Only 'yes' will be accepted to approve.")
+            fmt.Print("Enter a value: ")
+            var input string
+            fmt.Scanln(&input)
+            input = strings.ToLower(strings.TrimSpace(input))
+            if input != "yes" {
+                logger.Info("aborted by user")
+                return nil
+            }
+        }
+
+        if err := exec.Apply(manifest); err != nil {
+            return fmt.Errorf("apply failed: %w", err)
+        }
+        logger.Info("apply completed successfully")
+        return nil
+    },
+}
+
 var planCmd = &cobra.Command{
 	Use:   "plan",
 	Short: "Preview a YAML plan of statements (dry-run)",
@@ -184,14 +286,24 @@ func init() {
 
 	rootCmd.AddCommand(convertCmd)
 	rootCmd.AddCommand(planCmd)
+	rootCmd.AddCommand(applyCmd)
 
     planCmd.AddCommand(planStatementsCmd)
+    applyCmd.AddCommand(applyStatementCmd)
     planStatementsCmd.Flags().StringP("account-id", "i", "", "YNAB account ID")
     planStatementsCmd.MarkFlagRequired("file")
     planStatementsCmd.MarkFlagRequired("account-id")
 
 	convertCmd.MarkFlagRequired("file")
-	planCmd.MarkFlagRequired("file")
+	applyCmd.Flags().Bool("auto-approve", false, "Skip interactive approval and create transactions")
+	applyCmd.Flags().StringP("account-id", "i", "", "YNAB account ID (needed when applying a single statement CSV)")
+	applyStatementCmd.Flags().Bool("auto-approve", false, "Skip interactive approval and create transactions")
+    applyStatementCmd.Flags().StringP("account-id", "i", "", "YNAB account ID")
+    applyStatementCmd.MarkFlagRequired("file")
+    applyStatementCmd.MarkFlagRequired("account-id")
+
+    applyCmd.MarkFlagRequired("file")
+    planCmd.MarkFlagRequired("file")
 }
 
 func main() {
