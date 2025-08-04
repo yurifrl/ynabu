@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -55,6 +56,7 @@ func (s *Server) setupRoutes() {
 
     // consolidated endpoint
     s.mux.HandleFunc("/api/process", s.handleProcess)
+    s.mux.HandleFunc("/api/apply", s.handleApply)
     s.mux.HandleFunc("/api/files/", s.handleFiles)
 
 
@@ -155,6 +157,50 @@ type Transaction struct {
 }
 
 // handleFiles serves the generated CSV for a previously processed statement.
+// ---------------- apply (plan + create) handler ----------------
+func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+    // TODO: Work in menory instead of temp file
+    file, header, err := r.FormFile("statement")
+    if err != nil {
+        http.Error(w, "statement file required", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
+    data, _ := io.ReadAll(file)
+
+    accountID := r.FormValue("account_id")
+    if accountID == "" {
+        http.Error(w, "account_id required", http.StatusBadRequest)
+        return
+    }
+
+    // save temp file for executor to read
+    tmp := filepath.Join(os.TempDir(), header.Filename)
+    if err := os.WriteFile(tmp, data, 0600); err != nil {
+        http.Error(w, "failed temp write", 500)
+        return
+    }
+
+    stmt := &models.Statement{FilePath: tmp, AccountID: accountID}
+
+    ynabCli := ynab.New(s.config.YNAB.Token)
+    exec := executors.New(s.logger, s.config, ynabCli)
+
+    if err := exec.Apply(stmt); err != nil {
+        http.Error(w, err.Error(), 502)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    _ = json.NewEncoder(w).Encode(map[string]any{"status": "applied"})
+}
+
+// ---------------- file download handler ----------------
+
 func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
     filename := strings.TrimPrefix(r.URL.Path, "/api/files/")
     if filename == "" {

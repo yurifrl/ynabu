@@ -55,6 +55,13 @@
                 {{end}}
             </select>
         </div>
+        <div class="config-field">
+            <label><input id="override" type="checkbox"> Override</label>
+        </div>
+        <div class="config-field" id="account-override-container" style="display:none">
+            <label for="account-override">Account ID</label>
+            <input id="account-override" name="account_id" type="text" placeholder="Account ID">
+        </div>
     </header>
 
 
@@ -65,9 +72,9 @@
     <form id="reconcile-form"
           hx-post="/api/process"
           hx-encoding="multipart/form-data"
-          hx-trigger="change from:#statement, change from:#account"
+          hx-trigger="change from:#statement, change from:#account, change from:#account-override"
           hx-target="#result"
-          hx-include="#token,#account,#statement">
+          hx-include="#token,#account,#account-override,#statement">
     </form>
 
     <div id="result"></div>
@@ -76,6 +83,7 @@
         <div class="result-container">
             <div class="actions">
                 <a href="" class="download-link">Download CSV</a>
+                <button type="button" id="apply-btn">Apply</button>
             </div>
             <table>
                 <thead>
@@ -98,7 +106,7 @@
             el.value = localStorage.getItem(id) || "";
             el.addEventListener('input', () => localStorage.setItem(id, el.value));
         }
-        ['token'].forEach(persist);
+        ['token', 'account-override'].forEach(persist);
 
         // Persist account select to localStorage
         const accountSelect = document.getElementById('account');
@@ -109,6 +117,33 @@
                 // Manually trigger the form request so the diff refreshes
                 htmx.trigger(accountSelect, 'change');
             }
+        });
+
+        // Override account selection
+        const overrideChk = document.getElementById('override');
+        const accountOverrideContainer = document.getElementById('account-override-container');
+        const accountOverrideInput = document.getElementById('account-override');
+
+        // Restore persisted values
+        overrideChk.checked = localStorage.getItem('override') === 'true';
+        accountOverrideInput.value = localStorage.getItem('account-override') || '';
+
+        function syncOverrideUI() {
+            const isChecked = overrideChk.checked;
+            accountSelect.style.display = isChecked ? 'none' : '';
+            accountSelect.disabled = isChecked;
+            accountOverrideContainer.style.display = isChecked ? 'flex' : 'none';
+        }
+        syncOverrideUI();
+
+        overrideChk.addEventListener('change', () => {
+            localStorage.setItem('override', overrideChk.checked);
+            syncOverrideUI();
+            htmx.trigger(accountOverrideInput, 'change');
+        });
+
+        accountOverrideInput.addEventListener('input', () => {
+            localStorage.setItem('account-override', accountOverrideInput.value);
         });
 
         // Update file label on selection
@@ -176,6 +211,20 @@
                                 tbody.appendChild(row);
                             });
                         }
+
+                                                // wire apply button
+                        const applyBtn = clone.querySelector('#apply-btn');
+                        applyBtn.addEventListener('click', async () => {
+                            const f = fileInput.files[0];
+                            const acc = accountSelect.value;
+                            if (!f || !acc) { alert('choose file and account'); return; }
+                            const fd = new FormData();
+                            fd.append('statement', f);
+                            fd.append('account_id', acc);
+                            const res = await fetch('/api/apply', { method: 'POST', body: fd });
+                            const j = await res.json();
+                            alert(j.status === 'applied' ? 'Applied ✔' : 'Apply failed');
+                        });
 
                         evt.detail.target.appendChild(clone);
                         return;
