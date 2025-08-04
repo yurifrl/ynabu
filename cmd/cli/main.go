@@ -142,8 +142,11 @@ var applyCmd = &cobra.Command{
         exec := executors.New(logger, cfg, ynabClient)
 
         // Always show the plan first
-        if err := exec.Plan(manifest); err != nil {
-            return fmt.Errorf("plan failed: %w", err)
+        for i := range manifest.Statements {
+            st := &manifest.Statements[i]
+            if err := exec.Plan(st); err != nil {
+                return fmt.Errorf("plan failed: %w", err)
+            }
         }
 
         if !autoApprove {
@@ -159,8 +162,11 @@ var applyCmd = &cobra.Command{
             }
         }
 
-        if err := exec.Apply(manifest); err != nil {
-            return fmt.Errorf("apply failed: %w", err)
+        for i := range manifest.Statements {
+            st := &manifest.Statements[i]
+            if err := exec.Apply(st); err != nil {
+                return fmt.Errorf("apply failed: %w", err)
+            }
         }
         logger.Info("apply completed successfully")
         return nil
@@ -186,7 +192,8 @@ var applyStatementCmd = &cobra.Command{
         ynabClient := ynab.New(cfg.YNAB.Token)
         exec := executors.New(logger, cfg, ynabClient)
 
-        if err := exec.Plan(manifest); err != nil {
+        st := &manifest.Statements[0]
+        if err := exec.Plan(st); err != nil {
             return fmt.Errorf("plan failed: %w", err)
         }
 
@@ -203,8 +210,11 @@ var applyStatementCmd = &cobra.Command{
             }
         }
 
-        if err := exec.Apply(manifest); err != nil {
-            return fmt.Errorf("apply failed: %w", err)
+        for i := range manifest.Statements {
+            st := &manifest.Statements[i]
+            if err := exec.Apply(st); err != nil {
+                return fmt.Errorf("apply failed: %w", err)
+            }
         }
         logger.Info("apply completed successfully")
         return nil
@@ -230,10 +240,12 @@ var planCmd = &cobra.Command{
 		ynabClient := ynab.New(cfg.YNAB.Token)
 
 		exec := executors.New(logger, cfg, ynabClient)
-		err = exec.Plan(manifest)
-		if err != nil {
-			return fmt.Errorf("failed to plan: %w", err)
-		}
+        for i := range manifest.Statements {
+            st := &manifest.Statements[i]
+            if err := exec.Plan(st); err != nil {
+                return fmt.Errorf("failed to plan: %w", err)
+            }
+        }
 
 		return nil
 	},
@@ -262,7 +274,8 @@ var planStatementsCmd = &cobra.Command{
         ynabClient := ynab.New(cfg.YNAB.Token)
         exec := executors.New(logger, cfg, ynabClient)
 
-        if err := exec.Plan(manifest); err != nil {
+        st := &manifest.Statements[0]
+        if err := exec.Plan(st); err != nil {
             return fmt.Errorf("failed to plan: %w", err)
         }
 
