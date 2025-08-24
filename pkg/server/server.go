@@ -52,12 +52,12 @@ func (s *Server) Start(addr string) error {
 
 func (s *Server) setupRoutes() {
     // homepage
-    s.mux.HandleFunc("/", s.handleHome)
+    s.mux.HandleFunc("/", s.withLogging(s.handleHome))
 
     // consolidated endpoint
-    s.mux.HandleFunc("/api/process", s.handleProcess)
-    s.mux.HandleFunc("/api/apply", s.handleApply)
-    s.mux.HandleFunc("/api/files/", s.handleFiles)
+    s.mux.HandleFunc("/api/process", s.withLogging(s.handleProcess))
+    s.mux.HandleFunc("/api/apply", s.withLogging(s.handleApply))
+    s.mux.HandleFunc("/api/files/", s.withLogging(s.handleFiles))
 
 
 }
@@ -66,33 +66,36 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
     data := struct{
         Accounts []config.Account
     }{Accounts: s.config.YNAB.Accounts}
-    s.template.ExecuteTemplate(w, "index.html", data)
+    if err := s.template.ExecuteTemplate(w, "index.html", data); err != nil {
+        s.respondError(w, r, http.StatusInternalServerError, "failed to render page", err)
+        return
+    }
 }
 
 // ---------------- consolidated handler ----------------
 func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
     if r.Method != http.MethodPost {
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        s.respondError(w, r, http.StatusMethodNotAllowed, "method not allowed", nil)
         return
     }
 
     // read file
     file, header, err := r.FormFile("statement")
     if err != nil {
-        http.Error(w, "Failed to read file", http.StatusBadRequest)
+        s.respondError(w, r, http.StatusBadRequest, "failed to read file", err)
         return
     }
     defer file.Close()
     data, err := io.ReadAll(file)
     if err != nil {
-        http.Error(w, "Failed to read file", http.StatusInternalServerError)
+        s.respondError(w, r, http.StatusInternalServerError, "failed to read file", err)
         return
     }
 
     // parse local transactions once
     localTxs, err := s.parser.ProcessBytes(data, header.Filename)
     if err != nil {
-        http.Error(w, fmt.Sprintf("Failed to process file: %v", err), http.StatusBadRequest)
+        s.respondError(w, r, http.StatusBadRequest, "failed to process file", err)
         return
     }
 
@@ -118,7 +121,7 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
         ynabClient := ynab.New(token)
         remoteTxs, err := ynabClient.Transaction().GetTransactionsByAccount(budgetID, accountID, nil)
         if err != nil {
-            http.Error(w, fmt.Sprintf("Failed to fetch remote transactions: %v", err), http.StatusInternalServerError)
+            s.respondError(w, r, http.StatusBadGateway, "failed to fetch remote transactions", err)
             return
         }
         report := executors.BuildReport(localTxs, remoteTxs, s.config.UseCustomID)
@@ -133,17 +136,19 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
         }
         toAdd = report.MissingCount()
         inSync = report.InSyncCount()
+        s.logger.Info("reconciliation complete", "file", header.Filename, "to_add", toAdd, "in_sync", inSync)
     }
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]interface{}{
+    if err := s.writeJSON(w, http.StatusOK, map[string]interface{}{
         "status":  "success",
         "file":    filename,
         "data":    txs,
         "lines":   lines,
         "to_add":  toAdd,
         "in_sync": inSync,
-    })
+    }); err != nil {
+        s.logger.Warn("failed to write json response", "err", err)
+    }
 }
 
 // ---------------- file download handler ----------------
@@ -160,13 +165,13 @@ type Transaction struct {
 // ---------------- apply (plan + create) handler ----------------
 func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
     if r.Method != http.MethodPost {
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+        s.respondError(w, r, http.StatusMethodNotAllowed, "method not allowed", nil)
         return
     }
     // TODO: Work in menory instead of temp file
     file, header, err := r.FormFile("statement")
     if err != nil {
-        http.Error(w, "statement file required", http.StatusBadRequest)
+        s.respondError(w, r, http.StatusBadRequest, "statement file required", err)
         return
     }
     defer file.Close()
@@ -174,14 +179,14 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 
     accountID := r.FormValue("account_id")
     if accountID == "" {
-        http.Error(w, "account_id required", http.StatusBadRequest)
+        s.respondError(w, r, http.StatusBadRequest, "account_id required", nil)
         return
     }
 
     // save temp file for executor to read
     tmp := filepath.Join(os.TempDir(), header.Filename)
     if err := os.WriteFile(tmp, data, 0600); err != nil {
-        http.Error(w, "failed temp write", 500)
+        s.respondError(w, r, http.StatusInternalServerError, "failed to write temp file", err)
         return
     }
 
@@ -191,12 +196,13 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
     exec := executors.New(s.logger, s.config, ynabCli)
 
     if err := exec.Apply(stmt); err != nil {
-        http.Error(w, err.Error(), 502)
+        s.respondError(w, r, http.StatusBadGateway, "apply failed", err)
         return
     }
 
-    w.Header().Set("Content-Type", "application/json")
-    _ = json.NewEncoder(w).Encode(map[string]any{"status": "applied"})
+    if err := s.writeJSON(w, http.StatusOK, map[string]any{"status": "applied"}); err != nil {
+        s.logger.Warn("failed to write json response", "err", err)
+    }
 }
 
 // ---------------- file download handler ----------------
@@ -204,24 +210,62 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
     filename := strings.TrimPrefix(r.URL.Path, "/api/files/")
     if filename == "" {
-        http.Error(w, "filename required", http.StatusBadRequest)
+        s.respondError(w, r, http.StatusBadRequest, "filename required", nil)
         return
     }
 
     // Retrieve cached transactions
     value, ok := s.transactions.Load(filename)
     if !ok {
-        http.NotFound(w, r)
+        s.respondError(w, r, http.StatusNotFound, "file not found", nil)
         return
     }
     txs, ok := value.([]*models.Transaction)
     if !ok {
-        http.Error(w, "internal type assertion error", http.StatusInternalServerError)
+        s.respondError(w, r, http.StatusInternalServerError, "internal type assertion error", nil)
         return
     }
 
     w.Header().Set("Content-Type", "text/csv")
     w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
-    w.Write(csv.Create(txs, nil))
+    if _, err := w.Write(csv.Create(txs, nil)); err != nil {
+        s.logger.Warn("failed to write csv response", "err", err)
+    }
+}
+
+// --- helpers ---
+
+// writeJSON encodes v as JSON with the given status and writes headers.
+func (s *Server) writeJSON(w http.ResponseWriter, status int, v interface{}) error {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    return json.NewEncoder(w).Encode(v)
+}
+
+// respondError logs the error and returns a minimal JSON error body.
+func (s *Server) respondError(w http.ResponseWriter, r *http.Request, status int, message string, err error) {
+    if err != nil {
+        s.logger.Warn("request error", "status", status, "msg", message, "err", err, "method", r.Method, "path", r.URL.Path)
+    } else {
+        s.logger.Warn("request error", "status", status, "msg", message, "method", r.Method, "path", r.URL.Path)
+    }
+    _ = s.writeJSON(w, status, map[string]string{
+        "status": "error",
+        "error":  message,
+    })
+}
+
+// withLogging wraps a handler to log request start/end and recover panics.
+func (s *Server) withLogging(next http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        s.logger.Debug("http request", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
+        defer func() {
+            if rec := recover(); rec != nil {
+                s.logger.Error("panic recovered", "panic", rec, "method", r.Method, "path", r.URL.Path)
+                s.respondError(w, r, http.StatusInternalServerError, "internal server error", fmt.Errorf("panic: %v", rec))
+            }
+        }()
+        next(w, r)
+    }
 }
 
