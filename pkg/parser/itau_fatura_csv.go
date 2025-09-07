@@ -69,11 +69,11 @@ func (p *Parser) ParseItauFaturaCSV(data []byte) ([]*models.Transaction, error) 
 			continue
 		}
 
-		// Build transaction as extrato (simpler & enough for reconciliation)
+		// Build transaction as fatura (credit card bill)
 		tx, err := models.NewTransaction().
 			SetPayee(payee).
-			SetExtrato().
-			SetValueFromExtrato(fmt.Sprintf("%.2f", amount)).
+			SetFatura("", ""). // CSV format doesn't have card type/number info
+			SetValueFromFatura(fmt.Sprintf("%.2f", amount)).
 			SetDate(dmy).
 			Build()
 		if err != nil {

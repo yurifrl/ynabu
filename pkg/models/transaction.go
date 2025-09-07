@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/brunomvsouza/ynab.go/api"
 )
 
 type Transaction struct {
-	date            string
-	payee           string
-	memo            string
-	amount          float64
-	docType         string
-	cardType        string
-	cardNumber      string
-	err             error
+	date       string
+	payee      string
+	memo       string
+	amount     float64
+	docType    string
+	cardType   string
+	cardNumber string
+	err        error
 }
 
 func NewTransaction() *Transaction {
@@ -63,7 +64,6 @@ func (t *Transaction) Build() (*Transaction, error) {
 	return t, nil
 }
 
-
 func (t *Transaction) SetValueFromExtrato(valueStr string) *Transaction {
 	valueStr = strings.TrimSpace(strings.ReplaceAll(valueStr, ",", "."))
 	value, err := strconv.ParseFloat(valueStr, 64)
@@ -95,7 +95,30 @@ func (t *Transaction) SetDate(date string) *Transaction {
 		return t
 	}
 
+	// Convert from dd/mm/yyyy to yyyy/mm/dd
 	t.date = fmt.Sprintf("%s/%s/%s", t.date[6:10], t.date[3:5], t.date[0:2])
+
+	// Validate the date is within acceptable range for YNAB API
+	// YNAB rejects dates that are in the future or more than 5 years ago
+	parsedDate, err := time.Parse("2006/01/02", t.date)
+	if err != nil {
+		t.err = fmt.Errorf("invalid date format: %w", err)
+		return t
+	}
+
+	now := time.Now()
+	fiveYearsAgo := now.AddDate(-5, 0, 0)
+
+	if parsedDate.After(now) {
+		t.err = fmt.Errorf("date cannot be in the future: %s", t.date)
+		return t
+	}
+
+	if parsedDate.Before(fiveYearsAgo) {
+		t.err = fmt.Errorf("date cannot be more than 5 years ago: %s", t.date)
+		return t
+	}
+
 	return t
 }
 
@@ -126,35 +149,35 @@ func (t *Transaction) Memo() string {
 }
 
 func (t *Transaction) Amount() float64 {
-    return t.amount
+	return t.amount
 }
 
 // PayeePointer returns a pointer to the formatted payee or nil when empty.
 func (t *Transaction) PayeePointer() *string {
-    p := t.Payee()
-    if p == "" {
-        return nil
-    }
-    return &p
+	p := t.Payee()
+	if p == "" {
+		return nil
+	}
+	return &p
 }
 
 // MemoPointer returns a pointer to the memo or nil when empty.
 func (t *Transaction) MemoPointer() *string {
-    if t.memo == "" {
-        return nil
-    }
-    m := t.memo
-        return &m
+	if t.memo == "" {
+		return nil
+	}
+	m := t.memo
+	return &m
 }
 
 // APIDate converts the internal date string (yyyy/mm/dd) into an api.Date
 // understood by the YNAB SDK.
 func (t *Transaction) APIDate() (api.Date, error) {
-    return api.DateFromString(strings.ReplaceAll(t.date, "/", "-"))
+	return api.DateFromString(strings.ReplaceAll(t.date, "/", "-"))
 }
 
 // AmountMilliunits converts the float amount into the integer milliunits used
 // by the YNAB API (1000 milliunits == 1 currency unit).
 func (t *Transaction) AmountMilliunits() int64 {
-    return int64(t.amount * 1000)
+	return int64(t.amount * 1000)
 }

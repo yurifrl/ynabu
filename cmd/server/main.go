@@ -11,18 +11,24 @@ import (
 	"github.com/yurifrl/ynabu/pkg/server"
 )
 
-var cfgFile string
-
 var rootCmd = &cobra.Command{
 	Use:   "ynabu-server",
 	Short: "Run ynabu HTTP server",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Set log level based on debug flag
+		debug, _ := cmd.Flags().GetBool("debug")
+		level := log.InfoLevel
+		if debug {
+			level = log.DebugLevel
+		}
 		logger := log.NewWithOptions(os.Stderr, log.Options{
 			ReportCaller:    true,
 			ReportTimestamp: true,
 			Prefix:          "ynabu",
+			Level:           level,
 		})
 
+		cfgFile, _ := cmd.Flags().GetString("config")
 		cfg, err := config.Build(cfgFile, cmd.Flags())
 		if err != nil {
 			return err
@@ -36,8 +42,9 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "Config file (default is config.yaml)")
+	rootCmd.PersistentFlags().StringP("config", "c", "", "Config file (default is config.yaml)")
 	rootCmd.Flags().String("port", "", "Server port (overrides config)")
+	rootCmd.Flags().Bool("debug", false, "Enable debug logging")
 }
 
 func main() {

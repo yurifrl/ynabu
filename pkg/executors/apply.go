@@ -44,8 +44,10 @@ func (e *Executor) Apply(statement *models.Statement) error {
 		return err
 	}
 	if len(batch) == 0 {
+		e.logger.Info("no valid transactions to create after filtering")
 		return nil // safety check
 	}
+	e.logger.Info("sending batch to YNAB API", "count", len(batch), "account_id", statement.AccountID)
 	if err := ts.CreateTransactions(statement.BudgetID, batch); err != nil {
 		return fmt.Errorf("failed to create transactions: %w", err)
 	}
