@@ -8,16 +8,6 @@ import (
 	"github.com/yurifrl/ynabu/pkg/models"
 )
 
-type FileType string
-
-const (
-	ItauExtratoXLS FileType = "itau_extrato_xls"
-	ItauFaturaXLS  FileType = "itau_fatura_xls"
-	ItauExtratoTXT FileType = "itau_extrato_txt"
-	ItauExtratoOFX FileType = "itau_extrato_ofx"
-	YNABCSV        FileType = "ynab_csv"
-)
-
 type Parser struct {
 	logger *log.Logger
 }
@@ -29,45 +19,25 @@ func New(logger *log.Logger) *Parser {
 }
 
 func (p *Parser) ProcessBytes(data []byte, filename string) ([]*models.Transaction, error) {
-	fileType := detectType(filename)
-	p.logger.Debug("detected file type", "type", fileType, "filename", filename)
+	lowerFilename := strings.ToLower(filename)
+	p.logger.Debug("processing file", "filename", filename)
 
-	switch fileType {
-	case ItauExtratoXLS:
-		return p.ParseItauExtratoXLS(data)
-	case ItauFaturaXLS:
+	// Check for specific file patterns first (most specific to least specific)
+	switch {
+	case strings.Contains(lowerFilename, "fatura") && strings.HasSuffix(lowerFilename, ".xls"):
 		return p.ParseItauFaturaXLS(data)
-	case ItauExtratoTXT:
+	case strings.Contains(lowerFilename, "fatura") && strings.HasSuffix(lowerFilename, ".csv"):
+		return p.ParseItauFaturaCSV(data)
+	case strings.HasSuffix(lowerFilename, ".txt"):
 		return p.ParseItauExtratoTXT(data)
-	case ItauExtratoOFX:
+	case strings.HasSuffix(lowerFilename, ".ofx"):
 		return p.ParseItauExtratoOFX(data)
-	case YNABCSV:
+	case strings.HasSuffix(lowerFilename, ".xls"):
+		return p.ParseItauExtratoXLS(data)
+	case strings.HasSuffix(lowerFilename, ".csv"):
 		return p.ParseYNABCSV(data)
 	default:
 		p.logger.Debug("unknown file type", "filename", filename)
 		return nil, fmt.Errorf("unknown file type")
 	}
-}
-
-func detectType(filename string) FileType {
-	lowerFilename := strings.ToLower(filename)
-
-	// Prioritize explicit keywords when available
-	if strings.Contains(lowerFilename, "fatura") && strings.HasSuffix(lowerFilename, ".xls") {
-		return ItauFaturaXLS
-	}
-	if strings.HasSuffix(lowerFilename, ".txt") {
-		return ItauExtratoTXT
-	}
-	if strings.HasSuffix(lowerFilename, ".ofx") {
-		return ItauExtratoOFX
-	}
-	if strings.HasSuffix(lowerFilename, ".xls") {
-		return ItauExtratoXLS
-	}
-	if strings.HasSuffix(lowerFilename, ".csv") {
-		return YNABCSV
-	}
-
-	return ""
 }
