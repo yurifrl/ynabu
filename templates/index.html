@@ -397,10 +397,14 @@
                         applyBtn.addEventListener('click', async () => {
                             const f = fileInput.files[0];
                             const acc = accountSelect.value;
-                            if (!f || !acc) { alert('choose file and account'); return; }
+                            const budget = budgetSelect.value;
+                            const token = tokenInput.value;
+                            if (!f || !acc || !budget || !token) { alert('choose file, budget, account and token'); return; }
                             const fd = new FormData();
                             fd.append('statement', f);
                             fd.append('account_id', acc);
+                            fd.append('budget_id', budget);
+                            fd.append('token', token);
                             const res = await fetch('/api/apply', { method: 'POST', body: fd });
                             const j = await res.json();
                             alert(j.status === 'applied' ? 'Applied ✔' : 'Apply failed');
