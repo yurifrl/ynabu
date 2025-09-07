@@ -27,8 +27,9 @@ type YNABConfig struct {
 
 // Statement represents a single statement to be processed.
 type Statement struct {
-	FilePath   string `yaml:"file"`
-	AccountID  string `yaml:"account_id"`
+	FilePath  string `yaml:"file"`
+	BudgetID  string `yaml:"budget_id"`
+	AccountID string `yaml:"account_id"`
 }
 
 // File returns the absolute path to the statement file, expanding ~.

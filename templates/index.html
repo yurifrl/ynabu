@@ -47,21 +47,18 @@
             <input id="token" name="token" type="password" placeholder="Personal Access Token" title="Personal Access Token">
         </div>
         <div class="config-field">
-            <label for="account">Account</label>
-            <select id="account" name="account_id">
-                <option value="">Choose account</option>
-                {{range .Accounts}}
-                    <option value="{{.ID}}">{{.Name}}</option>
-                {{end}}
+            <label for="budget">Budget</label>
+            <select id="budget" name="budget_id">
+                <option value="">Choose budget</option>
             </select>
         </div>
         <div class="config-field">
-            <label><input id="override" type="checkbox"> Override</label>
+            <label for="account">Account</label>
+            <select id="account" name="account_id">
+                <option value="">Choose account</option>
+            </select>
         </div>
-        <div class="config-field" id="account-override-container" style="display:none">
-            <label for="account-override">Account ID</label>
-            <input id="account-override" name="account_id" type="text" placeholder="Account ID">
-        </div>
+
     </header>
 
 
@@ -72,9 +69,9 @@
     <form id="reconcile-form"
           hx-post="/api/process"
           hx-encoding="multipart/form-data"
-          hx-trigger="change from:#statement, change from:#account, change from:#account-override"
+          hx-trigger="change from:#statement, change from:#account"
           hx-target="#result"
-          hx-include="#token,#account,#account-override,#statement">
+          hx-include="#token,#budget,#account,#statement">
     </form>
 
     <div id="result"></div>
@@ -106,11 +103,66 @@
             el.value = localStorage.getItem(id) || "";
             el.addEventListener('input', () => localStorage.setItem(id, el.value));
         }
-        ['token', 'account-override'].forEach(persist);
+        ['token'].forEach(persist);
 
-        // Persist account select to localStorage
+        // Budget and account selection
+        const budgetSelect = document.getElementById('budget');
         const accountSelect = document.getElementById('account');
-        accountSelect.value = localStorage.getItem('account') || "";
+        
+        // Load budgets when token changes
+        const tokenInput = document.getElementById('token');
+        tokenInput.addEventListener('input', debounce(() => {
+            // Clear any existing error messages
+            const existingError = document.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            const token = tokenInput.value.trim();
+            if (token) {
+                loadBudgets(token);
+            } else {
+                budgetSelect.innerHTML = '<option value="">Choose budget</option>';
+                accountSelect.innerHTML = '<option value="">Choose account</option>';
+                // Clear saved selections when token is cleared
+                localStorage.removeItem('budget');
+                localStorage.removeItem('account');
+            }
+        }, 500));
+        
+        // Load accounts when budget changes
+        budgetSelect.addEventListener('change', () => {
+            // Clear any existing error messages
+            const existingError = document.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            const token = tokenInput.value;
+            const budgetId = budgetSelect.value;
+            if (token && budgetId) {
+                loadAccounts(token, budgetId);
+            } else {
+                accountSelect.innerHTML = '<option value="">Choose account</option>';
+            }
+        });
+        
+        // Persist budget and account selections to localStorage
+        const savedBudget = localStorage.getItem('budget') || "";
+        const savedAccount = localStorage.getItem('account') || "";
+        
+        // Restore budget selection
+        budgetSelect.value = savedBudget;
+        budgetSelect.addEventListener('change', () => {
+            localStorage.setItem('budget', budgetSelect.value);
+            if (fileInput.files && fileInput.files.length) {
+                // Manually trigger the form request so the diff refreshes
+                htmx.trigger(budgetSelect, 'change');
+            }
+        });
+        
+        // Restore account selection
+        accountSelect.value = savedAccount;
         accountSelect.addEventListener('change', () => {
             localStorage.setItem('account', accountSelect.value);
             if (fileInput.files && fileInput.files.length) {
@@ -118,33 +170,161 @@
                 htmx.trigger(accountSelect, 'change');
             }
         });
-
-        // Override account selection
-        const overrideChk = document.getElementById('override');
-        const accountOverrideContainer = document.getElementById('account-override-container');
-        const accountOverrideInput = document.getElementById('account-override');
-
-        // Restore persisted values
-        overrideChk.checked = localStorage.getItem('override') === 'true';
-        accountOverrideInput.value = localStorage.getItem('account-override') || '';
-
-        function syncOverrideUI() {
-            const isChecked = overrideChk.checked;
-            accountSelect.style.display = isChecked ? 'none' : '';
-            accountSelect.disabled = isChecked;
-            accountOverrideContainer.style.display = isChecked ? 'flex' : 'none';
+        
+        // Initialize on page load - load budgets if token exists
+        function initializeOnLoad() {
+            const token = tokenInput.value.trim();
+            if (token) {
+                loadBudgets(token);
+            }
         }
-        syncOverrideUI();
+        
+        // Run initialization after a short delay to ensure DOM is ready
+        setTimeout(initializeOnLoad, 100);
+        
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
 
-        overrideChk.addEventListener('change', () => {
-            localStorage.setItem('override', overrideChk.checked);
-            syncOverrideUI();
-            htmx.trigger(accountOverrideInput, 'change');
-        });
+        function showError(message) {
+            // Remove any existing error messages
+            const existingError = document.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            // Create error message element
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.style.cssText = 'color: red; background: #ffe6e6; border: 1px solid #ff9999; padding: 10px; margin: 10px 0; border-radius: 4px;';
+            errorDiv.textContent = message;
+            
+            // Insert after the config header
+            const configHeader = document.querySelector('.config');
+            configHeader.insertAdjacentElement('afterend', errorDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
 
-        accountOverrideInput.addEventListener('input', () => {
-            localStorage.setItem('account-override', accountOverrideInput.value);
-        });
+        function loadBudgets(token) {
+            budgetSelect.innerHTML = '<option value="">Loading budgets...</option>';
+            budgetSelect.disabled = true;
+            
+            fetch(`/api/budgets?token=${encodeURIComponent(token)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        budgetSelect.innerHTML = '<option value="">Choose budget</option>';
+                        console.log('Budgets response:', data); // Debug log
+                        
+                        // Handle different possible response structures
+                        let budgets = [];
+                        if (Array.isArray(data.budgets)) {
+                            budgets = data.budgets;
+                        } else if (data.budgets && Array.isArray(data.budgets.budgets)) {
+                            budgets = data.budgets.budgets;
+                        } else if (data.data && Array.isArray(data.data.budgets)) {
+                            budgets = data.data.budgets;
+                        }
+                        
+                        budgets.forEach(budget => {
+                            const option = document.createElement('option');
+                            option.value = budget.id;
+                            option.textContent = budget.name;
+                            budgetSelect.appendChild(option);
+                        });
+                        budgetSelect.disabled = false;
+                        
+                        // Restore saved budget selection
+                        const savedBudget = localStorage.getItem('budget') || "";
+                        if (savedBudget) {
+                            budgetSelect.value = savedBudget;
+                            // Trigger account loading if budget is restored
+                            const token = tokenInput.value;
+                            if (token && savedBudget) {
+                                loadAccounts(token, savedBudget);
+                            }
+                        }
+                    } else {
+                        throw new Error(data.error || 'Failed to load budgets');
+                    }
+                })
+                .catch(error => {
+                    budgetSelect.innerHTML = '<option value="">Choose budget</option>';
+                    budgetSelect.disabled = false;
+                    showError(`Error loading budgets: ${error.message}`);
+                });
+        }
+        
+        function loadAccounts(token, budgetId) {
+            accountSelect.innerHTML = '<option value="">Loading accounts...</option>';
+            accountSelect.disabled = true;
+            
+            fetch(`/api/budgets/${budgetId}?token=${encodeURIComponent(token)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        accountSelect.innerHTML = '<option value="">Choose account</option>';
+                        console.log('Accounts response:', data); // Debug log
+                        
+                        // Handle different possible response structures
+                        let accounts = [];
+                        if (Array.isArray(data.accounts)) {
+                            accounts = data.accounts;
+                        } else if (data.accounts && Array.isArray(data.accounts.accounts)) {
+                            accounts = data.accounts.accounts;
+                        } else if (data.data && Array.isArray(data.data.accounts)) {
+                            accounts = data.data.accounts;
+                        }
+                        
+                        accounts.forEach(account => {
+                            const option = document.createElement('option');
+                            option.value = account.id;
+                            option.textContent = account.name;
+                            accountSelect.appendChild(option);
+                        });
+                        accountSelect.disabled = false;
+                        
+                        // Restore saved account selection
+                        const savedAccount = localStorage.getItem('account') || "";
+                        if (savedAccount) {
+                            accountSelect.value = savedAccount;
+                        }
+                    } else {
+                        throw new Error(data.error || 'Failed to load accounts');
+                    }
+                })
+                .catch(error => {
+                    accountSelect.innerHTML = '<option value="">Choose account</option>';
+                    accountSelect.disabled = false;
+                    showError(`Error loading accounts: ${error.message}`);
+                });
+        }
+
+
 
         // Update file label on selection
         const fileInput = document.getElementById('statement');

@@ -4,9 +4,4 @@ use-custom-id: true
 
 ynab:
   budget_id: 9730dbc6-ca95-4ce3-b310-93ec12f0aa3b
-  token: $YNAB_ACCESS_TOKEN
-  accounts:
-    - name: Checkings
-      id: dd4c395a-fdea-4fed-ae65-ac50ee29029a
-    - name: Credit Card
-      id: 6a779e63-5efe-4f89-99d8-a20c8c0976e7 
+  token: $YNAB_ACCESS_TOKEN 
