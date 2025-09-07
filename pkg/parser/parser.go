@@ -56,7 +56,6 @@ func detectType(filename string) FileType {
 	if strings.Contains(lowerFilename, "fatura") && strings.HasSuffix(lowerFilename, ".xls") {
 		return ItauFaturaXLS
 	}
-
 	if strings.HasSuffix(lowerFilename, ".txt") {
 		return ItauExtratoTXT
 	}
