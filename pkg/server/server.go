@@ -214,7 +214,7 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 			if entry.Status == executors.ToAdd {
 				prefix = "+"
 			}
-			line := fmt.Sprintf("%s %s | %-30s | R$ %.2f", prefix, entry.Local.Date(), entry.Local.Payee(), entry.Local.Amount())
+			line := fmt.Sprintf("%s %s | %-30s | R$ %.2f | %s", prefix, entry.Local.Date(), entry.Local.Payee(), entry.Local.Amount(), entry.Local.ID())
 			lines = append(lines, line)
 		}
 		toAdd = report.MissingCount()

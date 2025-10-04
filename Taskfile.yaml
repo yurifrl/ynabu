@@ -1,6 +1,10 @@
 version: '3'
 
 tasks:
+  run:
+    cmds:
+      - go run ./cmd/server/main.go --debug
+
   build:
     cmds:
       - go build -o ynabu cmd/cli/*.go

@@ -19,6 +19,7 @@ type Transaction struct {
 	docType    string
 	cardType   string
 	cardNumber string
+	position   int
 	err        error
 }
 
@@ -40,6 +41,11 @@ func (t *Transaction) SetFatura(cardType, cardNumber string) *Transaction {
 
 func (t *Transaction) SetExtrato() *Transaction {
 	t.docType = "extrato"
+	return t
+}
+
+func (t *Transaction) SetPosition(position int) *Transaction {
+	t.position = position
 	return t
 }
 
@@ -123,7 +129,7 @@ func (t *Transaction) SetDate(date string) *Transaction {
 }
 
 func (t *Transaction) ID() string {
-	data := fmt.Sprintf("%s-%s-%.2f", t.date, t.payee, t.amount)
+	data := fmt.Sprintf("%s-%s-%.2f-%d", t.date, t.payee, t.amount, t.position)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:8])
 }
