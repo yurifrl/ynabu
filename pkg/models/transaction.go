@@ -19,7 +19,8 @@ type Transaction struct {
 	docType    string
 	cardType   string
 	cardNumber string
-	position   int
+	lineNumber int // line number in the original file
+	position   int // position within the day
 	err        error
 }
 
@@ -44,9 +45,18 @@ func (t *Transaction) SetExtrato() *Transaction {
 	return t
 }
 
+func (t *Transaction) SetLineNumber(lineNumber int) *Transaction {
+	t.lineNumber = lineNumber
+	return t
+}
+
 func (t *Transaction) SetPosition(position int) *Transaction {
 	t.position = position
 	return t
+}
+
+func (t *Transaction) LineNumber() int {
+	return t.lineNumber
 }
 
 func (t *Transaction) Build() (*Transaction, error) {
@@ -61,12 +71,8 @@ func (t *Transaction) Build() (*Transaction, error) {
 		return nil, fmt.Errorf("payee is required")
 	}
 
-	// Generate memo
-	if t.docType == "fatura" {
-		t.memo = fmt.Sprintf("\"%s,%s,%s\"", t.ID(), t.cardType, t.cardNumber)
-	} else {
-		t.memo = fmt.Sprintf("\"%s,extrato\"", t.ID())
-	}
+	// Don't generate memo here - it will be generated lazily in Memo()
+	// after position is set by setTransactionPositions
 	return t, nil
 }
 
@@ -151,6 +157,14 @@ func (t *Transaction) Payee() string {
 }
 
 func (t *Transaction) Memo() string {
+	// Generate memo lazily so it uses the current position value
+	if t.memo == "" {
+		if t.docType == "fatura" {
+			t.memo = fmt.Sprintf("\"%s,%s,%s\"", t.ID(), t.cardType, t.cardNumber)
+		} else {
+			t.memo = fmt.Sprintf("\"%s,extrato\"", t.ID())
+		}
+	}
 	return t.memo
 }
 
@@ -169,10 +183,10 @@ func (t *Transaction) PayeePointer() *string {
 
 // MemoPointer returns a pointer to the memo or nil when empty.
 func (t *Transaction) MemoPointer() *string {
-	if t.memo == "" {
+	m := t.Memo() // Generate memo if not already generated
+	if m == "" {
 		return nil
 	}
-	m := t.memo
 	return &m
 }
 

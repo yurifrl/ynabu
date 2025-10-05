@@ -67,6 +67,7 @@ func (p *Parser) ParseYNABCSV(data []byte) ([]*models.Transaction, error) {
             SetExtrato().
             SetValueFromExtrato(fmt.Sprintf("%.2f", amount)).
             SetDate(dmy).
+            SetLineNumber(i).
             Build()
         if err != nil {
             p.logger.Debug("failed to build transaction from csv line", "line", i, "err", err)

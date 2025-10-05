@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/log"
@@ -18,11 +19,15 @@ func New(logger *log.Logger) *Parser {
 	}
 }
 
-// setTransactionPositions assigns a position index to each transaction within its day
+// setTransactionPositions assigns a position index within each day based on line order
 func setTransactionPositions(transactions []*models.Transaction) {
-	// Group transactions by date
-	dateIndex := make(map[string]int)
+	// Sort by line number to preserve file order
+	sort.Slice(transactions, func(i, j int) bool {
+		return transactions[i].LineNumber() < transactions[j].LineNumber()
+	})
 
+	// Group by date and assign position within each day
+	dateIndex := make(map[string]int)
 	for _, tx := range transactions {
 		date := tx.Date()
 		position := dateIndex[date]

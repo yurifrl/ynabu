@@ -10,7 +10,7 @@ func (p *Parser) ParseItauExtratoTXT(data []byte) ([]*models.Transaction, error)
 	var transactions []*models.Transaction
 	lines := strings.Split(string(data), "\n")
 
-	for _, line := range lines {
+	for lineNum, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
@@ -29,6 +29,7 @@ func (p *Parser) ParseItauExtratoTXT(data []byte) ([]*models.Transaction, error)
 			SetExtrato().
 			SetValueFromExtrato(value).
 			SetDate(date).
+			SetLineNumber(lineNum).
 			Build()
 		if err != nil {
 			p.logger.Debug("error building transaction", "row", line, "error", err)

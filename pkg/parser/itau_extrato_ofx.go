@@ -34,7 +34,7 @@ func (p *Parser) ParseItauExtratoOFX(data []byte) ([]*models.Transaction, error)
 	trnRegex := regexp.MustCompile(`<STMTTRN>(?s)(.*?)</STMTTRN>`)
 	matches := trnRegex.FindAllStringSubmatch(string(content), -1)
 
-	for _, match := range matches {
+	for lineNum, match := range matches {
 		block := match[1]
 		
 		// Extract fields
@@ -65,6 +65,7 @@ func (p *Parser) ParseItauExtratoOFX(data []byte) ([]*models.Transaction, error)
 			SetExtrato().
 			SetValueFromExtrato(amount).
 			SetDate(date).
+			SetLineNumber(lineNum).
 			Build()
 		
 		if err != nil {

@@ -17,6 +17,11 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #f5f5f5; }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { background-color: #e5e5e5; }
+        th.sortable::after { content: ' ↕'; opacity: 0.3; }
+        th.sortable.asc::after { content: ' ↑'; opacity: 1; }
+        th.sortable.desc::after { content: ' ↓'; opacity: 1; }
         .amount { text-align: right; }
         .amount.negative { color: red; }
         .amount.positive { color: green; }
@@ -85,10 +90,10 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Payee</th>
-                        <th>Amount</th>
-                        <th>Memo</th>
+                        <th class="sortable" data-column="date">Date</th>
+                        <th class="sortable" data-column="payee">Payee</th>
+                        <th class="sortable" data-column="amount">Amount</th>
+                        <th class="sortable" data-column="memo">Memo</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -369,11 +374,15 @@
                                 if (parts.length >= 3) {
                                     const row = document.createElement('tr');
                                     row.className = prefix === '+' ? 'added' : 'synced';
+                                    row.dataset.date = parts[0];
+                                    row.dataset.payee = parts[1];
+                                    row.dataset.amount = parts[2].replace(/[^\d.,-]/g, '').replace(',', '.');
+                                    row.dataset.memo = parts[3] || '';
                                     row.innerHTML = `
                                         <td>${parts[0]}</td>
                                         <td>${parts[1]}</td>
                                         <td class="amount">${parts[2]}</td>
-                                        <td></td>
+                                        <td>${parts[3] || ''}</td>
                                     `;
                                     tbody.appendChild(row);
                                 }
@@ -382,6 +391,10 @@
                             // Fallback: show CSV rows only
                             response.data.forEach(tx => {
                                 const row = document.createElement('tr');
+                                row.dataset.date = tx.date;
+                                row.dataset.payee = tx.payee;
+                                row.dataset.amount = tx.amount;
+                                row.dataset.memo = tx.memo;
                                 row.innerHTML = `
                                     <td>${tx.date}</td>
                                     <td>${tx.payee}</td>
@@ -390,6 +403,67 @@
                                 `;
                                 tbody.appendChild(row);
                             });
+                        }
+
+                        // Apply initial sort by date (newest first) before adding event listeners
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        rows.sort((a, b) => {
+                            const valA = a.dataset.date.replace(/\//g, '');
+                            const valB = b.dataset.date.replace(/\//g, '');
+                            return valB.localeCompare(valA); // desc order
+                        });
+                        rows.forEach(row => tbody.appendChild(row));
+
+                        // Add sorting functionality
+                        const table = clone.querySelector('table');
+                        const headers = table.querySelectorAll('th.sortable');
+                        let currentSort = { column: 'date', direction: 'desc' };
+
+                        headers.forEach(header => {
+                            header.addEventListener('click', () => {
+                                const column = header.dataset.column;
+
+                                // Toggle direction if clicking same column, otherwise reset to desc for date, asc for others
+                                if (currentSort.column === column) {
+                                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                                } else {
+                                    currentSort.column = column;
+                                    currentSort.direction = column === 'date' ? 'desc' : 'asc';
+                                }
+
+                                // Update header classes
+                                headers.forEach(h => h.classList.remove('asc', 'desc'));
+                                header.classList.add(currentSort.direction);
+
+                                // Sort rows
+                                const rows = Array.from(tbody.querySelectorAll('tr'));
+                                rows.sort((a, b) => {
+                                    let valA = a.dataset[column];
+                                    let valB = b.dataset[column];
+
+                                    if (column === 'date') {
+                                        // Date is already in yyyy/mm/dd format, just remove slashes for comparison
+                                        valA = valA.replace(/\//g, '');
+                                        valB = valB.replace(/\//g, '');
+                                    } else if (column === 'amount') {
+                                        valA = parseFloat(valA);
+                                        valB = parseFloat(valB);
+                                    }
+
+                                    if (valA < valB) return currentSort.direction === 'asc' ? -1 : 1;
+                                    if (valA > valB) return currentSort.direction === 'asc' ? 1 : -1;
+                                    return 0;
+                                });
+
+                                // Re-append rows in sorted order
+                                rows.forEach(row => tbody.appendChild(row));
+                            });
+                        });
+
+                        // Mark date header with desc indicator
+                        const dateHeader = Array.from(headers).find(h => h.dataset.column === 'date');
+                        if (dateHeader) {
+                            dateHeader.classList.add('desc');
                         }
 
                                                 // wire apply button
